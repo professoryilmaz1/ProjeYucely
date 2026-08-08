@@ -1,0 +1,9 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { validateMatchProfile, mutualScore, rankMutualMatches, createConnection, approveConnection, MemoryStore, SQLiteStore } from '../src/index.js';
+import { unlinkSync } from 'node:fs';
+
+test('mutual match requires opt in',()=>{assert.throws(()=>validateMatchProfile({user_id:'u1',type:'FRIEND'}),/MATCH_OPT_IN_REQUIRED/);});
+test('relationship match is two way and ranked',()=>{const a=validateMatchProfile({user_id:'a',type:'RELATIONSHIP',opt_in:true,profile:{age:50,city:'Newark',interests:['travel','family']},criteria:{age_min:45,age_max:55,city:'Newark',interests:['travel']}});const b=validateMatchProfile({user_id:'b',type:'RELATIONSHIP',opt_in:true,profile:{age:48,city:'Newark',interests:['travel','family']},criteria:{age_min:48,age_max:60,city:'Newark',interests:['family']}});const m=mutualScore(a,b);assert.equal(m.eligible,true);assert.ok(m.mutual_score>=80);assert.equal(rankMutualMatches(a,[b]).length,1);});
+test('private contact is revealed only after both approve',()=>{const m={id:'m1',type:'FRIEND'};let c=createConnection(m,'a','b');c=approveConnection(c,'a');assert.equal(c.contact_revealed,false);c=approveConnection(c,'b');assert.equal(c.status,'MUTUALLY_APPROVED');assert.equal(c.contact_revealed,true);});
+test('match profiles and connections persist',()=>{const p=validateMatchProfile({user_id:'u1',type:'BUSINESS',opt_in:true,profile:{industry:'health'},criteria:{industry:'health'}});const mem=new MemoryStore();mem.saveMatchProfile(p);assert.equal(mem.getMatchProfile(p.id).type,'BUSINESS');const path='/tmp/projeyucely-match-test.db';try{unlinkSync(path)}catch{};const db=new SQLiteStore(path);db.saveMatchProfile(p);assert.equal(db.getMatchProfile(p.id).type,'BUSINESS');try{unlinkSync(path)}catch{};});

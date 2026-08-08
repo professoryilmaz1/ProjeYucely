@@ -1,0 +1,43 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { buildSavePlan, simulateWhatIf, fixMyDay, MemoryStore, YucelyService, OneButtonEngine } from '../src/index.js';
+
+test('save plan builds reductions toward target',()=>{
+ const out=buildSavePlan({target_amount:100,budget:{monthly_income:3000,total_expenses:2000,balance:1000,expenses:[{name:'Dining',amount:300},{name:'Subscriptions',amount:200}]}});
+ assert.equal(out.target_amount,100); assert.equal(out.projected_savings,100); assert.equal(out.target_met,true); assert.ok(out.actions.length>=2);
+});
+
+test('what-if simulates monthly and first-month impact',()=>{
+ const out=simulateWhatIf({budget:{monthly_income:3000,total_expenses:2500,balance:500},scenario:{monthly_income_delta:500,monthly_expense_delta:200,one_time_cost:1000}});
+ assert.equal(out.result.monthly_balance,800); assert.equal(out.result.first_month_balance,-200); assert.equal(out.result.monthly_change,300);
+});
+
+test('fix my day returns three prioritized actions',()=>{
+ const out=fixMyDay({dashboard:{metrics:{open_needs:1,availability_slots:0}},budget:{monthly_income:1000,total_expenses:1300,balance:-300},opportunities:[{id:'o1',net_amount:90}]});
+ assert.equal(out.actions.length,3); assert.equal(out.actions[0].type,'EARN');
+});
+
+test('ONE BUTTON save me X returns a save plan',()=>{
+ const store=new MemoryStore(),svc=new YucelyService(store),engine=new OneButtonEngine(store,svc); const u=svc.createProfile({display_name:'U'});
+ const out=engine.execute(u.id,'Save me $100 this month',{budget:{monthly_income:3000,expenses:[{name:'Dining',amount:300},{name:'Subscriptions',amount:200}]}});
+ assert.equal(out.result.status,'SAVE_PLAN_READY'); assert.equal(out.result.target_amount,100);
+});
+
+test('ONE BUTTON fix my day returns day plan',()=>{
+ const store=new MemoryStore(),svc=new YucelyService(store),engine=new OneButtonEngine(store,svc); const u=svc.createProfile({display_name:'U'});
+ const out=engine.execute(u.id,'Fix my day',{budget:{monthly_income:2000,expenses:[{name:'Rent',amount:1800}]}});
+ assert.equal(out.result.status,'DAY_PLAN_READY'); assert.equal(out.result.actions.length,3);
+});
+
+test('ONE BUTTON what if uses scenario context',()=>{
+ const store=new MemoryStore(),svc=new YucelyService(store),engine=new OneButtonEngine(store,svc); const u=svc.createProfile({display_name:'U'});
+ const out=engine.execute(u.id,'What if I earn more?',{budget:{monthly_income:3000,expenses:[{amount:2500}]},scenario:{monthly_income_delta:500}});
+ assert.equal(out.result.status,'WHAT_IF_READY'); assert.equal(out.result.simulation.result.monthly_balance,1000);
+});
+
+test('ONE BUTTON find me X routes to Money Mission without deadline',()=>{
+ const store=new MemoryStore(),svc=new YucelyService(store),engine=new OneButtonEngine(store,svc); const u=svc.createProfile({display_name:'U'}),owner=svc.createProfile({display_name:'Owner'});
+ svc.postOpportunity(owner.id,{title:'Task',start_time:'09:00',end_time:'11:00',net_amount:120});
+ const out=engine.execute(u.id,'Find me $100');
+ assert.equal(out.workflow.intent.primary_intent,'MONEY_MISSION'); assert.equal(out.result.status,'MONEY_MISSION_READY');
+});

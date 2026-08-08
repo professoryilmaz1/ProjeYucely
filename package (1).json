@@ -1,0 +1,42 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { MemoryStore, YucelyService, OneButtonEngine } from '../src/index.js';
+
+function setup(){const store=new MemoryStore();const svc=new YucelyService(store);const engine=new OneButtonEngine(store,svc);return {store,svc,engine};}
+
+test('ONE BUTTON turns natural language need into persisted need + matches',()=>{
+  const {svc,engine}=setup();
+  const requester=svc.createProfile({display_name:'Requester'});
+  const worker=svc.createProfile({display_name:'Worker',skills:['dog_sitting'],trust_score:0.95});
+  svc.addAvailability(worker.id,{start_time:'13:00',end_time:'17:00',minimum_amount:20,distance_km:3});
+  const out=engine.execute(requester.id,'Köpeğime 4 saat bakıcı lazım $50',{max_distance_km:10});
+  assert.equal(out.result.status,'NEED_CREATED');
+  assert.equal(out.result.need.amount,50);
+  assert.deepEqual(out.result.need.required_skills,['dog_sitting']);
+  assert.equal(out.result.matches[0].candidate.id,worker.id);
+});
+
+test('ONE BUTTON EARN stores availability and returns opportunities in window',()=>{
+  const {svc,engine}=setup();
+  const worker=svc.createProfile({display_name:'Worker'});const employer=svc.createProfile({display_name:'Employer'});
+  svc.postOpportunity(employer.id,{title:'Morning',start_time:'09:00',end_time:'10:00',net_amount:40});
+  svc.postOpportunity(employer.id,{title:'Afternoon',start_time:'13:00',end_time:'15:00',net_amount:70});
+  const out=engine.execute(worker.id,'Bugün saat 1-5 pm arası boşum para kazanmak istiyorum');
+  assert.equal(out.result.status,'EARN_PLAN_READY');
+  assert.equal(out.result.opportunities.length,1);
+  assert.equal(out.result.opportunities[0].title,'Afternoon');
+});
+
+test('ONE BUTTON money mission builds a plan',()=>{
+  const {svc,engine}=setup();
+  const worker=svc.createProfile({display_name:'Worker'}),a=svc.createProfile({display_name:'A'}),b=svc.createProfile({display_name:'B'});
+  svc.postOpportunity(a.id,{start_time:'09:00',end_time:'11:00',net_amount:80});svc.postOpportunity(b.id,{start_time:'12:00',end_time:'14:00',net_amount:70});
+  const out=engine.execute(worker.id,'Cuma gününe kadar $140 lazım');
+  assert.equal(out.result.status,'MONEY_MISSION_READY');assert.equal(out.result.target_met,true);assert.equal(out.result.projected_amount,150);
+});
+
+test('ONE BUTTON preserves approval gates for relationship matching',()=>{
+  const {svc,engine}=setup();const u=svc.createProfile({display_name:'A'});
+  const out=engine.execute(u.id,'Evlenmek istiyorum bana uygun biriyle eşleştir');
+  assert.equal(out.workflow.state,'NEEDS_APPROVAL');assert.equal(out.result.action,'request_user_approval');
+});

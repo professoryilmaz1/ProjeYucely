@@ -1,0 +1,43 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { classifySignal, buildVoiceReport, buildFeatureReport, buildOpportunityRadar, MemoryStore, SQLiteStore } from '../src/index.js';
+import { unlinkSync } from 'node:fs';
+
+test('radar classifies need and work seeker signals',()=>{
+  assert.equal(classifySignal({text:'Need someone to walk my dog tomorrow'}).intent,'NEED_HELP');
+  assert.equal(classifySignal({text:'I am looking for work this weekend'}).intent,'WORK_SEEKER');
+});
+
+test('voice report prioritizes frequent severe payment issue',()=>{
+  const report=buildVoiceReport([
+    {text:'My payout is delayed',source:'support',country:'US'},
+    {text:'payment delay again',source:'social',country:'US'},
+    {text:'button color issue',source:'app',country:'TR'}
+  ]);
+  assert.equal(report.issues[0].topic,'payout');
+  assert.equal(report.total_feedback,3);
+});
+
+test('feature intelligence finds most and least used',()=>{
+  const r=buildFeatureReport([
+    {feature:'ONE_BUTTON',user_id:'u1',status:'SUCCESS'},
+    {feature:'ONE_BUTTON',user_id:'u2',status:'SUCCESS'},
+    {feature:'WHAT_IF',user_id:'u1',status:'SUCCESS'}
+  ]);
+  assert.equal(r.most_used[0].feature,'ONE_BUTTON');
+  assert.equal(r.least_used[0].feature,'WHAT_IF');
+});
+
+test('opportunity radar summarizes sources',()=>{
+  const r=buildOpportunityRadar([{text:'Need someone today',source:'allowed_api',country:'US'},{text:'looking for work',source:'allowed_api',country:'TR'}]);
+  assert.equal(r.counts.NEED_HELP,1); assert.equal(r.counts.WORK_SEEKER,1);
+});
+
+test('intelligence events persist in memory and sqlite stores',()=>{
+  const mem=new MemoryStore(); mem.addFeedback({text:'payment delayed'}); mem.addFeatureEvent({feature:'ONE_BUTTON'}); mem.addExternalSignal({text:'looking for work'});
+  assert.equal(mem.listFeedback().length,1); assert.equal(mem.listFeatureEvents().length,1); assert.equal(mem.listExternalSignals().length,1);
+  const p='/tmp/projeyucely-intelligence-test.db'; try{unlinkSync(p)}catch{}
+  const db=new SQLiteStore(p); db.addFeedback({text:'payment delayed'}); db.addFeatureEvent({feature:'ONE_BUTTON'}); db.addExternalSignal({text:'looking for work'});
+  assert.equal(db.listFeedback().length,1); assert.equal(db.listFeatureEvents().length,1); assert.equal(db.listExternalSignals().length,1);
+  try{unlinkSync(p)}catch{}
+});
