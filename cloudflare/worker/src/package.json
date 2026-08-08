@@ -1,9 +1,0 @@
-{
-  "name": "projeyucely-cloudflare-worker",
-  "version": "2.1.0-cf1",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "test": "node --test worker.test.js"
-  }
-}
