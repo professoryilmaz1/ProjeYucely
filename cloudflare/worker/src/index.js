@@ -12,6 +12,7 @@ const json = (body, status = 200, headers = {}) =>
 
 function securityHeaders(resp) {
   const h = new Headers(resp.headers);
+
   h.set("x-frame-options", "DENY");
   h.set("permissions-policy", "camera=(), microphone=(), geolocation=(self)");
   h.set("strict-transport-security", "max-age=31536000; includeSubDomains");
@@ -35,19 +36,25 @@ export default {
     const url = new URL(request.url);
 
     if (request.method === "GET" && url.pathname === "/health") {
+      const stripeKey = env.STRIPE_SECRET_KEY || "";
+
       return securityHeaders(
         json({
           ok: true,
           service: "projeyucely-cloudflare-edge",
-          version: "2.1.0-cf1",
-          stripe_configured: Boolean(env.STRIPE_SECRET_KEY),
-          stripe_mode: env.STRIPE_MODE || "disabled",
+          version: "2.1.0-cf2",
+          stripe_configured: Boolean(stripeKey),
+          stripe_test_key:
+            stripeKey.startsWith("rk_test_") ||
+            stripeKey.startsWith("sk_test_"),
         })
       );
     }
 
     if (request.method === "GET" && url.pathname === "/stripe/test") {
-      if (!env.STRIPE_SECRET_KEY) {
+      const stripeKey = env.STRIPE_SECRET_KEY || "";
+
+      if (!stripeKey) {
         return securityHeaders(
           json(
             {
@@ -59,12 +66,15 @@ export default {
         );
       }
 
-      if (env.STRIPE_MODE !== "test") {
+      if (
+        !stripeKey.startsWith("rk_test_") &&
+        !stripeKey.startsWith("sk_test_")
+      ) {
         return securityHeaders(
           json(
             {
               ok: false,
-              error: "STRIPE_TEST_MODE_REQUIRED",
+              error: "STRIPE_TEST_KEY_REQUIRED",
             },
             403
           )
@@ -72,11 +82,10 @@ export default {
       }
 
       try {
-        const response = await fetch("https://api.stripe.com/v1/account", {
+        const response = await fetch("https://api.stripe.com/v1/balance", {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
-            "Stripe-Version": "2026-06-30.preview",
+            Authorization: `Bearer ${stripeKey}`,
           },
         });
 
@@ -90,6 +99,7 @@ export default {
                 stripe_connected: false,
                 stripe_status: response.status,
                 error: data?.error?.type || "STRIPE_AUTH_FAILED",
+                message: data?.error?.message || "Stripe request failed",
               },
               502
             )
@@ -101,9 +111,7 @@ export default {
             ok: true,
             stripe_connected: true,
             livemode: Boolean(data.livemode),
-            account_country: data.country || null,
-            charges_enabled: Boolean(data.charges_enabled),
-            payouts_enabled: Boolean(data.payouts_enabled),
+            object: data.object || null,
           })
         );
       } catch {
@@ -134,8 +142,18 @@ export default {
     }
 
     const asset = await serveAsset(request, env);
-    if (asset) return securityHeaders(asset);
 
-    return securityHeaders(json({ error: "NOT_FOUND" }, 404));
+    if (asset) {
+      return securityHeaders(asset);
+    }
+
+    return securityHeaders(
+      json(
+        {
+          error: "NOT_FOUND",
+        },
+        404
+      )
+    );
   },
 };
