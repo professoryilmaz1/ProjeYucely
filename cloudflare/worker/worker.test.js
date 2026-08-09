@@ -44,10 +44,6 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // -----------------------------
-    // HEALTH CHECK
-    // -----------------------------
-
     if (
       request.method === "GET" &&
       url.pathname === "/health"
@@ -67,10 +63,6 @@ export default {
       );
     }
 
-    // -----------------------------
-    // STRIPE CONNECTION TEST
-    // -----------------------------
-
     if (
       request.method === "GET" &&
       url.pathname === "/stripe/test"
@@ -89,8 +81,6 @@ export default {
         );
       }
 
-      // Prevent a LIVE Stripe key from being used
-      // through this diagnostic endpoint.
       if (
         !stripeKey.startsWith("rk_test_") &&
         !stripeKey.startsWith("sk_test_")
@@ -146,7 +136,7 @@ export default {
             object: data.object || null,
           })
         );
-      } catch (error) {
+      } catch {
         return securityHeaders(
           json(
             {
@@ -159,10 +149,6 @@ export default {
         );
       }
     }
-
-    // -----------------------------
-    // CORE API
-    // -----------------------------
 
     if (url.pathname.startsWith("/v1/")) {
       return securityHeaders(
@@ -177,19 +163,11 @@ export default {
       );
     }
 
-    // -----------------------------
-    // STATIC ASSETS
-    // -----------------------------
-
     const asset = await serveAsset(request, env);
 
     if (asset) {
       return securityHeaders(asset);
     }
-
-    // -----------------------------
-    // 404
-    // -----------------------------
 
     return securityHeaders(
       json(
