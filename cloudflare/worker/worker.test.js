@@ -1,3 +1,4 @@
+
 const json = (body, status = 200, headers = {}) =>
   new Response(JSON.stringify(body), {
     status,
@@ -14,14 +15,8 @@ function securityHeaders(resp) {
   const h = new Headers(resp.headers);
 
   h.set("x-frame-options", "DENY");
-  h.set(
-    "permissions-policy",
-    "camera=(), microphone=(), geolocation=(self)"
-  );
-  h.set(
-    "strict-transport-security",
-    "max-age=31536000; includeSubDomains"
-  );
+  h.set("permissions-policy", "camera=(), microphone=(), geolocation=(self)");
+  h.set("strict-transport-security", "max-age=31536000; includeSubDomains");
 
   return new Response(resp.body, {
     status: resp.status,
@@ -31,12 +26,9 @@ function securityHeaders(resp) {
 }
 
 async function serveAsset(request, env) {
-  if (!env.ASSETS?.fetch) {
-    return null;
-  }
+  if (!env.ASSETS?.fetch) return null;
 
   const response = await env.ASSETS.fetch(request);
-
   return response.status === 404 ? null : response;
 }
 
@@ -44,10 +36,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    if (
-      request.method === "GET" &&
-      url.pathname === "/health"
-    ) {
+    if (request.method === "GET" && url.pathname === "/health") {
       const stripeKey = env.STRIPE_SECRET_KEY || "";
 
       return securityHeaders(
@@ -63,10 +52,7 @@ export default {
       );
     }
 
-    if (
-      request.method === "GET" &&
-      url.pathname === "/stripe/test"
-    ) {
+    if (request.method === "GET" && url.pathname === "/stripe/test") {
       const stripeKey = env.STRIPE_SECRET_KEY || "";
 
       if (!stripeKey) {
@@ -97,15 +83,12 @@ export default {
       }
 
       try {
-        const response = await fetch(
-          "https://api.stripe.com/v1/balance",
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${stripeKey}`,
-            },
-          }
-        );
+        const response = await fetch("https://api.stripe.com/v1/balance", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${stripeKey}`,
+          },
+        });
 
         const data = await response.json();
 
@@ -116,12 +99,8 @@ export default {
                 ok: false,
                 stripe_connected: false,
                 stripe_status: response.status,
-                error:
-                  data?.error?.type ||
-                  "STRIPE_AUTH_FAILED",
-                message:
-                  data?.error?.message ||
-                  "Stripe request failed",
+                error: data?.error?.type || "STRIPE_AUTH_FAILED",
+                message: data?.error?.message || "Stripe request failed",
               },
               502
             )
