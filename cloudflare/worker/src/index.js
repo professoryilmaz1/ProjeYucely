@@ -24,6 +24,52 @@ function securityHeaders(resp) {
   });
 }
 
+function getStripeTestKey(env) {
+  const key = env.STRIPE_SECRET_KEY || "";
+
+  if (
+    !key.startsWith("rk_test_") &&
+    !key.startsWith("sk_test_")
+  ) {
+    return null;
+  }
+
+  return key;
+}
+
+function isAdminRequest(request, env) {
+  const configured = env.CONNECT_ADMIN_TOKEN || "";
+  const supplied = request.headers.get("x-admin-token") || "";
+
+  if (!configured || !supplied) return false;
+
+  return supplied === configured;
+}
+
+async function stripeRequest(url, stripeKey, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${stripeKey}`,
+      ...(options.headers || {}),
+    },
+  });
+
+  let data;
+
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    data,
+  };
+}
+
 async function serveAsset(request, env) {
   if (!env.ASSETS?.fetch) return null;
 
@@ -34,42 +80,31 @@ async function serveAsset(request, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const stripeKey = getStripeTestKey(env);
+
+    // -----------------------------
+    // HEALTH
+    // -----------------------------
 
     if (request.method === "GET" && url.pathname === "/health") {
-      const stripeKey = env.STRIPE_SECRET_KEY || "";
-
       return securityHeaders(
         json({
           ok: true,
           service: "projeyucely-cloudflare-edge",
-          version: "2.1.0-cf2",
-          stripe_configured: Boolean(stripeKey),
-          stripe_test_key:
-            stripeKey.startsWith("rk_test_") ||
-            stripeKey.startsWith("sk_test_"),
+          version: "2.1.0-cf3",
+          stripe_configured: Boolean(env.STRIPE_SECRET_KEY),
+          stripe_test_key: Boolean(stripeKey),
+          connect_admin_configured: Boolean(env.CONNECT_ADMIN_TOKEN),
         })
       );
     }
 
+    // -----------------------------
+    // STRIPE CONNECTION TEST
+    // -----------------------------
+
     if (request.method === "GET" && url.pathname === "/stripe/test") {
-      const stripeKey = env.STRIPE_SECRET_KEY || "";
-
       if (!stripeKey) {
-        return securityHeaders(
-          json(
-            {
-              ok: false,
-              error: "STRIPE_NOT_CONFIGURED",
-            },
-            500
-          )
-        );
-      }
-
-      if (
-        !stripeKey.startsWith("rk_test_") &&
-        !stripeKey.startsWith("sk_test_")
-      ) {
         return securityHeaders(
           json(
             {
@@ -81,52 +116,370 @@ export default {
         );
       }
 
-      try {
-        const response = await fetch("https://api.stripe.com/v1/balance", {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${stripeKey}`,
-          },
-        });
+      const stripe = await stripeRequest(
+        "https://api.stripe.com/v1/balance",
+        stripeKey,
+        { method: "GET" }
+      );
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          return securityHeaders(
-            json(
-              {
-                ok: false,
-                stripe_connected: false,
-                stripe_status: response.status,
-                error: data?.error?.type || "STRIPE_AUTH_FAILED",
-                message: data?.error?.message || "Stripe request failed",
-              },
-              502
-            )
-          );
-        }
-
-        return securityHeaders(
-          json({
-            ok: true,
-            stripe_connected: true,
-            livemode: Boolean(data.livemode),
-            object: data.object || null,
-          })
-        );
-      } catch {
+      if (!stripe.ok) {
         return securityHeaders(
           json(
             {
               ok: false,
               stripe_connected: false,
-              error: "STRIPE_REQUEST_FAILED",
+              stripe_status: stripe.status,
+              error:
+                stripe.data?.error?.type ||
+                "STRIPE_AUTH_FAILED",
+              message:
+                stripe.data?.error?.message ||
+                "Stripe request failed",
             },
             502
           )
         );
       }
+
+      return securityHeaders(
+        json({
+          ok: true,
+          stripe_connected: true,
+          livemode: Boolean(stripe.data.livemode),
+          object: stripe.data.object || null,
+        })
+      );
     }
+
+    // -----------------------------
+    // CREATE CONNECTED ACCOUNT
+    // -----------------------------
+
+    if (
+      request.method === "POST" &&
+      url.pathname === "/connect/account"
+    ) {
+      if (!stripeKey) {
+        return securityHeaders(
+          json(
+            {
+              ok: false,
+              error: "STRIPE_TEST_KEY_REQUIRED",
+            },
+            403
+          )
+        );
+      }
+
+      if (!isAdminRequest(request, env)) {
+        return securityHeaders(
+          json(
+            {
+              ok: false,
+              error: "UNAUTHORIZED",
+            },
+            401
+          )
+        );
+      }
+
+      let body;
+
+      try {
+        body = await request.json();
+      } catch {
+        return securityHeaders(
+          json(
+            {
+              ok: false,
+              error: "INVALID_JSON",
+            },
+            400
+          )
+        );
+      }
+
+      const email =
+        typeof body?.email === "string"
+          ? body.email.trim()
+          : "";
+
+      const displayName =
+        typeof body?.display_name === "string"
+          ? body.display_name.trim()
+          : "";
+
+      const country =
+        typeof body?.country === "string"
+          ? body.country.trim().toLowerCase()
+          : "us";
+
+      if (!email || !displayName) {
+        return securityHeaders(
+          json(
+            {
+              ok: false,
+              error: "EMAIL_AND_DISPLAY_NAME_REQUIRED",
+            },
+            400
+          )
+        );
+      }
+
+      const accountPayload = {
+        contact_email: email,
+        display_name: displayName,
+
+        defaults: {
+          responsibilities: {
+            fees_collector: "application",
+            losses_collector: "application",
+          },
+        },
+
+        dashboard: "express",
+
+        identity: {
+          country,
+        },
+
+        configuration: {
+          recipient: {
+            capabilities: {
+              stripe_balance: {
+                stripe_transfers: {
+                  requested: true,
+                },
+              },
+            },
+          },
+        },
+
+        include: [
+          "configuration.recipient",
+          "identity",
+          "requirements",
+        ],
+      };
+
+      const stripe = await stripeRequest(
+        "https://api.stripe.com/v2/core/accounts",
+        stripeKey,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "Stripe-Version": "2026-07-29.preview",
+          },
+          body: JSON.stringify(accountPayload),
+        }
+      );
+
+      if (!stripe.ok) {
+        return securityHeaders(
+          json(
+            {
+              ok: false,
+              error: "CONNECTED_ACCOUNT_CREATE_FAILED",
+              stripe_status: stripe.status,
+              stripe_error:
+                stripe.data?.error?.type || null,
+              message:
+                stripe.data?.error?.message ||
+                "Stripe account creation failed",
+            },
+            502
+          )
+        );
+      }
+
+      return securityHeaders(
+        json({
+          ok: true,
+          account_created: true,
+          account_id: stripe.data.id,
+          livemode: Boolean(stripe.data.livemode),
+        })
+      );
+    }
+
+    // -----------------------------
+    // CREATE HOSTED ONBOARDING LINK
+    // -----------------------------
+
+    if (
+      request.method === "POST" &&
+      url.pathname === "/connect/onboarding-link"
+    ) {
+      if (!stripeKey) {
+        return securityHeaders(
+          json(
+            {
+              ok: false,
+              error: "STRIPE_TEST_KEY_REQUIRED",
+            },
+            403
+          )
+        );
+      }
+
+      if (!isAdminRequest(request, env)) {
+        return securityHeaders(
+          json(
+            {
+              ok: false,
+              error: "UNAUTHORIZED",
+            },
+            401
+          )
+        );
+      }
+
+      let body;
+
+      try {
+        body = await request.json();
+      } catch {
+        return securityHeaders(
+          json(
+            {
+              ok: false,
+              error: "INVALID_JSON",
+            },
+            400
+          )
+        );
+      }
+
+      const accountId =
+        typeof body?.account_id === "string"
+          ? body.account_id.trim()
+          : "";
+
+      if (!accountId.startsWith("acct_")) {
+        return securityHeaders(
+          json(
+            {
+              ok: false,
+              error: "VALID_ACCOUNT_ID_REQUIRED",
+            },
+            400
+          )
+        );
+      }
+
+      const origin = url.origin;
+
+      const accountLinkPayload = {
+        account: accountId,
+
+        use_case: {
+          type: "account_onboarding",
+
+          account_onboarding: {
+            configurations: ["recipient"],
+
+            collection_options: {
+              fields: "eventually_due",
+            },
+
+            refresh_url:
+              `${origin}/connect/refresh?account=` +
+              encodeURIComponent(accountId),
+
+            return_url:
+              `${origin}/connect/return?account=` +
+              encodeURIComponent(accountId),
+          },
+        },
+      };
+
+      const stripe = await stripeRequest(
+        "https://api.stripe.com/v2/core/account_links",
+        stripeKey,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "Stripe-Version": "2026-07-29.preview",
+          },
+          body: JSON.stringify(accountLinkPayload),
+        }
+      );
+
+      if (!stripe.ok) {
+        return securityHeaders(
+          json(
+            {
+              ok: false,
+              error: "ONBOARDING_LINK_CREATE_FAILED",
+              stripe_status: stripe.status,
+              stripe_error:
+                stripe.data?.error?.type || null,
+              message:
+                stripe.data?.error?.message ||
+                "Stripe onboarding link creation failed",
+            },
+            502
+          )
+        );
+      }
+
+      return securityHeaders(
+        json({
+          ok: true,
+          onboarding_ready: true,
+          account_id: accountId,
+          onboarding_url: stripe.data.url,
+          expires_at: stripe.data.expires_at || null,
+        })
+      );
+    }
+
+    // -----------------------------
+    // ONBOARDING RETURN
+    // -----------------------------
+
+    if (
+      request.method === "GET" &&
+      url.pathname === "/connect/return"
+    ) {
+      return securityHeaders(
+        json({
+          ok: true,
+          onboarding_flow_returned: true,
+          account_id: url.searchParams.get("account"),
+          message:
+            "Stripe onboarding flow returned to ProjeYucely. Account status must still be verified before payouts.",
+        })
+      );
+    }
+
+    // -----------------------------
+    // EXPIRED/USED ONBOARDING LINK
+    // -----------------------------
+
+    if (
+      request.method === "GET" &&
+      url.pathname === "/connect/refresh"
+    ) {
+      return securityHeaders(
+        json(
+          {
+            ok: false,
+            error: "ONBOARDING_LINK_REFRESH_REQUIRED",
+            account_id: url.searchParams.get("account"),
+            message:
+              "Create a new authenticated onboarding link from the ProjeYucely application.",
+          },
+          409
+        )
+      );
+    }
+
+    // -----------------------------
+    // CORE API MIGRATION GATE
+    // -----------------------------
 
     if (url.pathname.startsWith("/v1/")) {
       return securityHeaders(
