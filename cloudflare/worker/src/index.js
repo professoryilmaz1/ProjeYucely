@@ -40,7 +40,46 @@ export default {
         stripe_mode: env.STRIPE_MODE || 'disabled',
       }));
     }
+if (request.method === 'GET' && url.pathname === '/stripe/test') {
+  if (!env.STRIPE_SECRET_KEY) {
+    return securityHeaders(json({
+      ok: false,
+      error: 'STRIPE_NOT_CONFIGURED'
+    }, 500));
+  }
 
+  try {
+    const response = await fetch('https://api.stripe.com/v1/account', {
+      headers: {
+        Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`
+      }
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return securityHeaders(json({
+        ok: false,
+        stripe_status: response.status,
+        error: data?.error?.type || 'STRIPE_AUTH_FAILED'
+      }, 502));
+    }
+
+    return securityHeaders(json({
+      ok: true,
+      stripe_connected: true,
+      livemode: Boolean(data.livemode),
+      account_country: data.country || null,
+      charges_enabled: Boolean(data.charges_enabled),
+      payouts_enabled: Boolean(data.payouts_enabled)
+    }));
+  } catch {
+    return securityHeaders(json({
+      ok: false,
+      error: 'STRIPE_REQUEST_FAILED'
+    }, 502));
+  }
+}
     if (url.pathname.startsWith('/v1/')) {
       return securityHeaders(json({
         error: 'API_MIGRATION_IN_PROGRESS',
