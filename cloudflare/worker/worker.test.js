@@ -1,4 +1,8 @@
+import "./test/worker-routes.test.js";
 
+/*
+ * Phase 0 false-test snapshot retained as review-only rollback context.
+ *
 const json = (body, status = 200, headers = {}) =>
   new Response(JSON.stringify(body), {
     status,
@@ -158,3 +162,4 @@ export default {
     );
   },
 };
+*/

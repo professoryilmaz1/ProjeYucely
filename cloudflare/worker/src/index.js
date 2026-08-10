@@ -1,3 +1,11 @@
+/*
+ * Phase 0 rollback snapshot.
+ *
+ * This implementation remains in place during Phase 1 so the previous Worker
+ * can be recovered directly from Git review history without touching the
+ * flattened legacy application. The active default export is the hardened
+ * Worker imported at the end of this file.
+ *
 const json = (body, status = 200, headers = {}) =>
   new Response(JSON.stringify(body), {
     status,
@@ -639,3 +647,6 @@ export default {
     );
   },
 };
+*/
+
+export { default } from "./worker.js";
