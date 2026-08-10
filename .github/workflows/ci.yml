@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  worker:
+    name: Worker safety checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Check Worker syntax
+        run: npm run check:worker
+
+      - name: Run Worker regression tests
+        run: npm run test:worker
+
+      - name: Check dependency advisories
+        run: npm audit --audit-level=high
+
+      - name: Validate Worker bundle
+        run: npx wrangler deploy --dry-run
+
+      - name: Check patch whitespace
+        run: git diff --check "${{ github.event.pull_request.base.sha || github.event.before }}" "${{ github.sha }}"
