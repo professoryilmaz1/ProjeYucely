@@ -1,0 +1,17 @@
+{
+  "name": "ProjeYucely",
+  "install": "npm ci",
+  "terminals": [
+    {
+      "name": "worker-dev",
+      "command": "WRANGLER_SEND_METRICS=false npm run dev",
+      "description": "ProjeYucely Cloudflare Worker edge API served locally via wrangler dev on http://127.0.0.1:8787 (routes: /health, /stripe/test, /connect/*, /payments/test-marketplace)."
+    }
+  ],
+  "ports": [
+    {
+      "name": "worker",
+      "port": 8787
+    }
+  ]
+}

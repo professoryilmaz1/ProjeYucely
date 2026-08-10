@@ -2,5 +2,13 @@
   "name": "projeyucely",
   "version": "2.1.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --ip 127.0.0.1 --port 8787",
+    "deploy": "wrangler deploy",
+    "test:worker": "node --test cloudflare/worker/worker.test.js"
+  },
+  "devDependencies": {
+    "wrangler": "^4.120.1"
+  }
 }
