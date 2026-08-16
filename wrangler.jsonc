@@ -3,5 +3,10 @@
   "name": "projeyucely",
   "main": "cloudflare/worker/src/index.js",
   "compatibility_date": "2026-08-08",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
   "keep_vars": true
 }
