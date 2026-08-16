@@ -1,3 +1,8 @@
+import * as Sentry from "@sentry/cloudflare";
+
+const SENTRY_DSN =
+  "https://da4e27baed26868fdb8051b050789a8a@o4511888786915328.ingest.us.sentry.io/4511888807100416";
+
 const json = (body, status = 200, headers = {}) =>
   new Response(JSON.stringify(body), {
     status,
@@ -95,7 +100,7 @@ async function serveAsset(request, env) {
   return response.status === 404 ? null : response;
 }
 
-export default {
+const worker = {
   async fetch(request, env) {
     const url = new URL(request.url);
     const stripeKey = getStripeTestKey(env);
@@ -639,3 +644,17 @@ export default {
     );
   },
 };
+
+export default Sentry.withSentry(
+  (env) => ({
+    dsn: SENTRY_DSN,
+    environment: env.ENVIRONMENT || "production",
+    release: "projeyucely@2.1.0",
+    sendDefaultPii: false,
+    dataCollection: {
+      userInfo: false,
+      httpBodies: [],
+    },
+  }),
+  worker
+);
