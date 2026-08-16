@@ -1,9 +1,13 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "projeyucely",
+  "name": "vovyyvov",
   "main": "cloudflare/worker/src/index.js",
-  "compatibility_date": "2026-08-08",
+  "compatibility_date": "2026-08-15",
   "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
