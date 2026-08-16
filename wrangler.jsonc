@@ -1,8 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "joyyvo",
+  "name": "vovyyvov",
   "main": "cloudflare/worker/src/index.js",
-  "compatibility_date": "2026-08-08",
+  "compatibility_date": "2026-08-15",
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "enabled": true,
