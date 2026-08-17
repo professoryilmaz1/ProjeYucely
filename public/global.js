@@ -35,6 +35,21 @@ function initMap(){
   const density=document.getElementById('densityStatus');if(density)density.textContent=geoState.located?'Loading nearby KREVUNO activity…':'Click anywhere on the map or use your location. Red = hiring/needs, blue = people available to work.';
   requestAnimationFrame(()=>map.invalidateSize({animate:false}));
 }
+function applyTrustAndFeeUI(){
+  const metric=[...document.querySelectorAll('.metrics article')].find(a=>a.querySelector('span')?.textContent?.includes('Platform fee'));
+  if(metric){const label=metric.querySelector('span'),value=metric.querySelector('strong');if(label)label.textContent='Worker marketplace fee';if(value)value.textContent='0%'}
+  const moneyHeading=[...document.querySelectorAll('.card h2')].find(h=>h.textContent.trim()==='How money works');
+  const moneyList=moneyHeading?.parentElement?.querySelector('.security-list');
+  if(moneyList)moneyList.innerHTML='<div><strong>Personal membership</strong><span>Free.</span></div><div><strong>Business signup</strong><span>Free.</span></div><div><strong>Worker marketplace fee</strong><span>0% of the agreed worker pay at launch. Third-party payout, tax or banking charges may apply.</span></div><div><strong>Employer service fee</strong><span>7% when a job is mutually confirmed where KREVUNO payment processing is enabled. The exact fee is shown before confirmation.</span></div><div><strong>Business Starter</strong><span>Optional $39/month after upgrade is activated.</span></div>';
+  const footer=document.querySelector('footer');
+  if(footer){
+    footer.classList.add('kr-trust-footer');
+    footer.innerHTML='<div class="kr-foot-brand">© 2026 IMPOCOR GROUP LLC • KREVUNO</div><div class="kr-foot-policy">Workers: <strong>0% marketplace commission</strong> • Employers: <strong>7% service fee</strong> at mutual confirmation • Local law applies</div><nav aria-label="KREVUNO legal"><a href="/legal.html#terms">Terms</a><a href="/legal.html#privacy">Privacy</a><a href="/legal.html#payments">Payments</a><a href="/legal.html#commitment">Cancellation & No-Show</a><a href="/legal.html#ratings">Ratings</a><a href="/legal.html#safety">Safety</a></nav><div class="kr-foot-note">Real opportunities only. No guarantee of work, workers, income or legal work authorization.</div>';
+  }
+  if(!document.getElementById('kr-trust-footer-style')){
+    const style=document.createElement('style');style.id='kr-trust-footer-style';style.textContent='.kr-trust-footer{max-width:1180px;margin:0 auto 26px;padding:28px 24px 34px;border-top:1px solid #e5e7eb}.kr-foot-brand{font-weight:800;color:#111827;letter-spacing:.02em}.kr-foot-policy{margin-top:8px;color:#475569}.kr-trust-footer nav{display:flex;justify-content:center;gap:8px 16px;flex-wrap:wrap;margin-top:14px}.kr-trust-footer a{color:#334155;text-decoration:none;font-weight:700}.kr-trust-footer a:hover{text-decoration:underline}.kr-foot-note{margin-top:12px;color:#64748b;font-size:12px}@media(prefers-color-scheme:dark){.kr-trust-footer{border-top-color:#334155}.kr-foot-brand{color:#f8fafc}.kr-foot-policy,.kr-trust-footer a{color:#cbd5e1}.kr-foot-note{color:#94a3b8}}';document.head.appendChild(style)
+  }
+}
 installGeoFetchBridge();
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initMap,{once:true});else initMap();
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{initMap();applyTrustAndFeeUI()},{once:true});else{initMap();applyTrustAndFeeUI()}
 idle(loadTranslator,1800);
