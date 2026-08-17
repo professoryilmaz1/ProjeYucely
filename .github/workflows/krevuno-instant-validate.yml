@@ -2,59 +2,20 @@ name: KREVUNO Instant Engine Validate
 
 on:
   push:
-    branches: [agent/krevuno-instant-local-engine-release]
+    branches:
+      - agent/krevuno-instant-local-engine-release
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Patch KREVUNO integration and final correctness safely
-        shell: python
-        run: |
-          from pathlib import Path
-          import re
-
-          p=Path('cloudflare/worker/src/index.js')
-          s=p.read_text()
-          old=s
-          if 'handleKrevunoJobPage' not in s:
-              s=s.replace('import * as Sentry from "@sentry/cloudflare";','import * as Sentry from "@sentry/cloudflare";\nimport { handleKrevunoJobPage } from "./krevuno-job-page.js";')
-          s=s.replace('camera=(), microphone=(), geolocation=(self)','camera=(self), microphone=(self), geolocation=(self)')
-          marker='    if (url.pathname.startsWith("/v1/")) {'
-          hook='    const krevunoJobPage = await handleKrevunoJobPage(request, env);\n    if (krevunoJobPage) return securityHeaders(krevunoJobPage);\n\n'
-          if hook not in s:
-              s=s.replace(marker,hook+marker)
-          if s!=old:
-              p.write_text(s)
-
-          p=Path('public/instant-engine.js')
-          s=p.read_text()
-          replacement="""function krMoneyFromText(text){const t=String(text||'');const patterns=[/(?:USD|\\$)\\s*(\\d{1,6}(?:\\.\\d{1,2})?)/i,/(\\d{1,6}(?:\\.\\d{1,2})?)\\s*(?:USD|dollars?|dolar)/i,/(?:EUR|€)\\s*(\\d{1,6}(?:\\.\\d{1,2})?)/i,/(\\d{1,6}(?:\\.\\d{1,2})?)\\s*(?:EUR|euros?)/i,/(?:GBP|£)\\s*(\\d{1,6}(?:\\.\\d{1,2})?)/i,/(\\d{1,6}(?:\\.\\d{1,2})?)\\s*(?:GBP|pounds?)/i,/(?:TRY|₺|TL)\\s*(\\d{1,6}(?:\\.\\d{1,2})?)/i,/(\\d{1,6}(?:\\.\\d{1,2})?)\\s*(?:TRY|TL|lira)/i];for(const p of patterns){const m=t.match(p);if(m){const n=Number(m[1]);if(Number.isFinite(n))return n}}return null}
-function krCurrencyFromText"""
-          s,n=re.subn(r'function krMoneyFromText\(text\)\{.*?\}\nfunction krCurrencyFromText',replacement,s,count=1,flags=re.S)
-          if n!=1:
-              raise SystemExit('Could not patch money parsing safely')
-          p.write_text(s)
-
-          p=Path('cloudflare/worker/src/krevuno-job-page.js')
-          s=p.read_text()
-          schema="const schema={'@context':'https://schema.org','@type':'JobPosting',title,description:desc,datePosted,validThrough,employmentType:'TEMPORARY',...(city?{jobLocation:{'@type':'Place',address:{'@type':'PostalAddress',addressLocality:city}}}:{})};const media="
-          s,n=re.subn(r"const schema=.*?;const media=",schema,s,count=1,flags=re.S)
-          if n!=1:
-              raise SystemExit('Could not patch JobPosting schema safely')
-          p.write_text(s)
-
-          p=Path('supabase/migrations/006_krevuno_nearby_and_public_jobs.sql')
-          s=p.read_text().replace('round(d.item_lat::numeric,2)','round(d.item_lat::numeric,1)').replace('round(d.item_lng::numeric,2)','round(d.item_lng::numeric,1)')
-          p.write_text(s)
       - name: JavaScript syntax checks
         run: |
           node --check public/instant-engine.js
@@ -76,18 +37,6 @@ function krCurrencyFromText"""
           grep -q 'krevuno_nearby_map' public/instant-engine.js
           grep -q '50-mile' public/index.html
           grep -q 'microphone=(self)' cloudflare/worker/src/index.js
-          grep -q "round(d.item_lat::numeric,1)" supabase/migrations/006_krevuno_nearby_and_public_jobs.sql
-          ! grep -q "unitText:'HOUR'" cloudflare/worker/src/krevuno-job-page.js
-          ! grep -q "name:'KREVUNO marketplace'" cloudflare/worker/src/krevuno-job-page.js
-      - name: Commit safe patches on branch
-        if: github.event_name == 'push'
-        run: |
-          if git diff --quiet; then
-            echo 'No patch needed.'
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add cloudflare/worker/src/index.js cloudflare/worker/src/krevuno-job-page.js public/instant-engine.js supabase/migrations/006_krevuno_nearby_and_public_jobs.sql
-          git commit -m 'Finalize KREVUNO instant-match correctness and privacy'
-          git push origin HEAD:agent/krevuno-instant-local-engine-release
+          grep -q 'round(d.item_lat::numeric,1)' supabase/migrations/006_krevuno_nearby_and_public_jobs.sql
+          if grep -q "unitText:'HOUR'" cloudflare/worker/src/krevuno-job-page.js; then exit 1; fi
+          if grep -q "name:'KREVUNO marketplace'" cloudflare/worker/src/krevuno-job-page.js; then exit 1; fi
