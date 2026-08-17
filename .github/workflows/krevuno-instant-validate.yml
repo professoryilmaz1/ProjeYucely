@@ -1,0 +1,66 @@
+name: KREVUNO Instant Engine Validate
+
+on:
+  push:
+    branches: [agent/krevuno-instant-local-engine-release]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch KREVUNO Worker integration safely
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('cloudflare/worker/src/index.js')
+          s=p.read_text()
+          old=s
+          if 'handleKrevunoJobPage' not in s:
+              s=s.replace('import * as Sentry from "@sentry/cloudflare";','import * as Sentry from "@sentry/cloudflare";\nimport { handleKrevunoJobPage } from "./krevuno-job-page.js";')
+          s=s.replace('camera=(), microphone=(), geolocation=(self)','camera=(self), microphone=(self), geolocation=(self)')
+          marker='    if (url.pathname.startsWith("/v1/")) {'
+          hook='    const krevunoJobPage = await handleKrevunoJobPage(request, env);\n    if (krevunoJobPage) return securityHeaders(krevunoJobPage);\n\n'
+          if hook not in s:
+              s=s.replace(marker,hook+marker)
+          if s!=old:
+              p.write_text(s)
+      - name: JavaScript syntax checks
+        run: |
+          node --check public/instant-engine.js
+          node --check public/global.js
+          node --check cloudflare/worker/src/krevuno-job-page.js
+          node --check cloudflare/worker/src/index.js
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Existing Worker regression tests
+        run: npm run test:worker
+      - name: Cloudflare dry run
+        run: npx wrangler deploy --dry-run
+      - name: KREVUNO UI contract checks
+        run: |
+          grep -q 'KREVUNO INSTANT MATCH' public/index.html
+          grep -q 'instantVoiceNote' public/index.html
+          grep -q 'dot need' public/index.html
+          grep -q 'dot worker' public/index.html
+          grep -q 'krevuno_nearby_map' public/instant-engine.js
+          grep -q '50-mile' public/index.html
+      - name: Commit Worker patch on branch
+        if: github.event_name == 'push'
+        run: |
+          if git diff --quiet; then
+            echo 'No Worker patch needed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add cloudflare/worker/src/index.js
+          git commit -m 'Wire KREVUNO job pages and local media permissions'
+          git push origin HEAD:agent/krevuno-instant-local-engine-release
