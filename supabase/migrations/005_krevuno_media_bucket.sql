@@ -10,11 +10,11 @@ do $$ begin
   end if;
   if not exists(select 1 from pg_policies where schemaname='storage' and tablename='objects' and policyname='krevuno_media_update_own') then
     create policy "krevuno_media_update_own" on storage.objects for update to authenticated
-      using(bucket_id='krevuno-media' and owner_id=(select auth.uid()))
-      with check(bucket_id='krevuno-media' and owner_id=(select auth.uid()));
+      using(bucket_id='krevuno-media' and owner_id=(select auth.uid())::text)
+      with check(bucket_id='krevuno-media' and owner_id=(select auth.uid())::text);
   end if;
   if not exists(select 1 from pg_policies where schemaname='storage' and tablename='objects' and policyname='krevuno_media_delete_own') then
     create policy "krevuno_media_delete_own" on storage.objects for delete to authenticated
-      using(bucket_id='krevuno-media' and owner_id=(select auth.uid()));
+      using(bucket_id='krevuno-media' and owner_id=(select auth.uid())::text);
   end if;
 end $$;
