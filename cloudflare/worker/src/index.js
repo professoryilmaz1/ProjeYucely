@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/cloudflare";
+import { handleKrevunoJobPage } from "./krevuno-job-page.js";
 
 const SENTRY_DSN =
   "https://da4e27baed26868fdb8051b050789a8a@o4511888786915328.ingest.us.sentry.io/4511888807100416";
@@ -19,7 +20,7 @@ function securityHeaders(resp) {
   const h = new Headers(resp.headers);
 
   h.set("x-frame-options", "DENY");
-  h.set("permissions-policy", "camera=(), microphone=(), geolocation=(self)");
+  h.set("permissions-policy", "camera=(self), microphone=(self), geolocation=(self)");
   h.set("strict-transport-security", "max-age=31536000; includeSubDomains");
 
   return new Response(resp.body, {
@@ -614,6 +615,9 @@ const worker = {
         )
       );
     }
+
+    const krevunoJobPage = await handleKrevunoJobPage(request, env);
+    if (krevunoJobPage) return securityHeaders(krevunoJobPage);
 
     if (url.pathname.startsWith("/v1/")) {
       return securityHeaders(
