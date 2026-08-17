@@ -1,0 +1,38 @@
+name: KREVUNO Validation
+on:
+  push:
+    branches: [agent/krevuno-rebrand-performance]
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: JavaScript syntax
+        run: |
+          node --check public/app.js
+          node --check public/global.js
+          node --check public/marketplace.js
+          node --check cloudflare/worker/src/index.js
+      - name: Critical UI contract
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const html=fs.readFileSync('public/index.html','utf8');
+          const required=['worldMap','locateBtn','worldBtn','radiusSlider','loginForm','signupForm','needForm','availForm','moneyForm','budgetForm','referralBtn','earnList','needList','availList','authMessage'];
+          for(const id of required){if(!html.includes(`id="${id}"`))throw new Error(`Missing critical UI id: ${id}`)}
+          if(!html.includes('KREVUNO'))throw new Error('KREVUNO branding missing');
+          if(html.includes('VOVYYVOV'))throw new Error('Legacy public brand text remains in index.html');
+          if(!html.includes('Personal — FREE'))throw new Error('Free personal signup copy missing');
+          if(!html.includes('Business / Organization — FREE signup'))throw new Error('Free business signup copy missing');
+          console.log('critical UI contract ok');
+          NODE
+      - name: Worker tests
+        run: npm run test:worker
+      - name: Wrangler deploy dry run
+        run: npx wrangler deploy --dry-run
