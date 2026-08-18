@@ -1,12 +1,14 @@
 {
   "name": "vovyyvov",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --ip 127.0.0.1 --port 8787",
     "deploy": "wrangler deploy",
-    "test:worker": "node --test cloudflare/worker/worker.test.js"
+    "test:worker": "node --test cloudflare/worker/worker.test.js",
+    "test:agent": "node --test krevuno-agent.test.js",
+    "test": "node --test krevuno-agent.test.js"
   },
   "devDependencies": {
     "wrangler": "^4.120.1"
