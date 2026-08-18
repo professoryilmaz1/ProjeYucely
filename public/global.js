@@ -49,3 +49,4 @@ async function loadActivity(map,renderer){
 installGeoFetchBridge();
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initMap,{once:true});else initMap();
 idle(loadTranslator,1800);
+import './krevuno-agent.js';
