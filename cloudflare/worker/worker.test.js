@@ -1,160 +1,267 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  classifyOpportunityHeuristic,
+  dedupeOpportunities,
+  scoreOpportunityMatch,
+  syncExternalOpportunities,
+  worker,
+} from "./src/index.js";
 
-const json = (body, status = 200, headers = {}) =>
-  new Response(JSON.stringify(body), {
+const originalFetch = globalThis.fetch;
+
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
     status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store",
-      "x-content-type-options": "nosniff",
-      "referrer-policy": "no-referrer",
-      ...headers,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function setMockFetch(handler) {
+  globalThis.fetch = handler;
+}
+
+test.after(() => {
+  globalThis.fetch = originalFetch;
+});
+
+test("heuristic classification extracts remote, kind and skills", () => {
+  const classified = classifyOpportunityHeuristic({
+    title: "Remote React developer contract",
+    description: "Build frontend workflows and TypeScript dashboards.",
+    tags: ["javascript", "frontend"],
+  });
+  assert.equal(classified.remote, true);
+  assert.equal(classified.kind, "GIG");
+  assert.ok(classified.skills.includes("software"));
+});
+
+test("dedupe keeps the richer external opportunity", () => {
+  const input = [
+    {
+      source_provider: "remotive",
+      source_id: "1",
+      title: "Designer",
+      company_name: "KREVUNO",
+      city: "Berlin",
+      dedupe_hash: "same",
+      description: "",
     },
-  });
+    {
+      source_provider: "remoteok",
+      source_id: "2",
+      title: "Designer",
+      company_name: "KREVUNO",
+      city: "Berlin",
+      dedupe_hash: "same",
+      description: "Detailed role",
+      amount: 120,
+      latitude: 52.52,
+    },
+  ];
+  const result = dedupeOpportunities(input);
+  assert.equal(result.opportunities.length, 1);
+  assert.equal(result.duplicateCount, 1);
+  assert.equal(result.opportunities[0].source_provider, "remoteok");
+});
 
-function securityHeaders(resp) {
-  const h = new Headers(resp.headers);
-
-  h.set("x-frame-options", "DENY");
-  h.set("permissions-policy", "camera=(), microphone=(), geolocation=(self)");
-  h.set("strict-transport-security", "max-age=31536000; includeSubDomains");
-
-  return new Response(resp.body, {
-    status: resp.status,
-    statusText: resp.statusText,
-    headers: h,
-  });
-}
-
-async function serveAsset(request, env) {
-  if (!env.ASSETS?.fetch) return null;
-
-  const response = await env.ASSETS.fetch(request);
-  return response.status === 404 ? null : response;
-}
-
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-
-    if (request.method === "GET" && url.pathname === "/health") {
-      const stripeKey = env.STRIPE_SECRET_KEY || "";
-
-      return securityHeaders(
-        json({
-          ok: true,
-          service: "projeyucely-cloudflare-edge",
-          version: "2.1.0-cf2",
-          stripe_configured: Boolean(stripeKey),
-          stripe_test_key:
-            stripeKey.startsWith("rk_test_") ||
-            stripeKey.startsWith("sk_test_"),
-        })
-      );
+test("match scoring favors nearby skill-aligned opportunities", () => {
+  const close = scoreOpportunityMatch(
+    {
+      title: "Warehouse shift",
+      skills: ["warehouse"],
+      tags: ["inventory"],
+      amount: 120,
+      remote: false,
+      latitude: 40.71,
+      longitude: -74.0,
+      created_at: new Date().toISOString(),
+    },
+    {
+      availabilitySkills: ["warehouse"],
+      profileSkills: ["operations"],
+      minimumAmounts: [80],
+      lat: 40.73,
+      lng: -73.98,
+      radiusMiles: 25,
     }
-
-    if (request.method === "GET" && url.pathname === "/stripe/test") {
-      const stripeKey = env.STRIPE_SECRET_KEY || "";
-
-      if (!stripeKey) {
-        return securityHeaders(
-          json(
-            {
-              ok: false,
-              error: "STRIPE_NOT_CONFIGURED",
-            },
-            500
-          )
-        );
-      }
-
-      if (
-        !stripeKey.startsWith("rk_test_") &&
-        !stripeKey.startsWith("sk_test_")
-      ) {
-        return securityHeaders(
-          json(
-            {
-              ok: false,
-              error: "STRIPE_TEST_KEY_REQUIRED",
-            },
-            403
-          )
-        );
-      }
-
-      try {
-        const response = await fetch("https://api.stripe.com/v1/balance", {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${stripeKey}`,
-          },
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          return securityHeaders(
-            json(
-              {
-                ok: false,
-                stripe_connected: false,
-                stripe_status: response.status,
-                error: data?.error?.type || "STRIPE_AUTH_FAILED",
-                message: data?.error?.message || "Stripe request failed",
-              },
-              502
-            )
-          );
-        }
-
-        return securityHeaders(
-          json({
-            ok: true,
-            stripe_connected: true,
-            livemode: Boolean(data.livemode),
-            object: data.object || null,
-          })
-        );
-      } catch {
-        return securityHeaders(
-          json(
-            {
-              ok: false,
-              stripe_connected: false,
-              error: "STRIPE_REQUEST_FAILED",
-            },
-            502
-          )
-        );
-      }
+  );
+  const far = scoreOpportunityMatch(
+    {
+      title: "Warehouse shift",
+      skills: ["warehouse"],
+      tags: ["inventory"],
+      amount: 120,
+      remote: false,
+      latitude: 34.05,
+      longitude: -118.25,
+      created_at: new Date().toISOString(),
+    },
+    {
+      availabilitySkills: ["warehouse"],
+      profileSkills: ["operations"],
+      minimumAmounts: [80],
+      lat: 40.73,
+      lng: -73.98,
+      radiusMiles: 25,
     }
+  );
+  assert.ok(close.score > far.score);
+  assert.ok(close.reasons.includes("WITHIN_RADIUS"));
+  assert.ok(far.reasons.includes("OUTSIDE_RADIUS"));
+});
 
-    if (url.pathname.startsWith("/v1/")) {
-      return securityHeaders(
-        json(
+test("syncExternalOpportunities normalizes feeds and writes sync state", async () => {
+  const calls = [];
+  setMockFetch(async (url, init = {}) => {
+    calls.push({ url: String(url), method: init.method || "GET" });
+    const value = String(url);
+    if (value.includes("remotive.com/api/remote-jobs")) {
+      return jsonResponse({
+        jobs: [
           {
-            error: "API_MIGRATION_IN_PROGRESS",
-            message:
-              "Core API remains disabled on Cloudflare until D1-backed persistence and auth migration pass regression tests.",
+            id: 1,
+            title: "Remote React developer contract",
+            company_name: "Acme",
+            candidate_required_location: "Remote",
+            salary: "$120",
+            url: "https://jobs.example/remotive-1",
+            publication_date: "2026-08-19T10:00:00Z",
           },
-          503
-        )
-      );
+        ],
+      });
     }
-
-    const asset = await serveAsset(request, env);
-
-    if (asset) {
-      return securityHeaders(asset);
+    if (value.includes("arbeitnow.com/api/job-board-api")) {
+      return jsonResponse({
+        data: [
+          {
+            slug: "berlin-ops",
+            title: "Operations coordinator",
+            company_name: "Globex",
+            location: "Berlin, Germany",
+            remote: false,
+            description: "Dispatch and logistics support",
+            created_at: "2026-08-19T10:00:00Z",
+          },
+        ],
+      });
     }
-
-    return securityHeaders(
-      json(
+    if (value.includes("jobicy.com/api/v2/remote-jobs")) {
+      return jsonResponse({ jobs: [] });
+    }
+    if (value.includes("remoteok.com/api")) {
+      return jsonResponse([
+        { legal: "meta" },
         {
-          error: "NOT_FOUND",
+          id: 3,
+          position: "Remote React developer contract",
+          company: "Acme",
+          location: "Remote",
+          description: "Duplicate of remotive role",
+          url: "https://jobs.example/remoteok-3",
+          epoch: 1_755_597_600,
         },
-        404
-      )
-    );
-  },
-};
+      ]);
+    }
+    if (value.includes("nominatim.openstreetmap.org")) {
+      return jsonResponse([
+        {
+          lat: "52.5200",
+          lon: "13.4050",
+          address: { city: "Berlin", country: "Germany" },
+        },
+      ]);
+    }
+    if (value.includes("/rest/v1/vovyyvov_opportunity_sync_runs") && (init.method || "GET") === "POST") {
+      return jsonResponse([{ id: "run-1" }]);
+    }
+    if (value.includes("/rest/v1/vovyyvov_opportunity_geo_cache")) {
+      if ((init.method || "GET") === "GET") return jsonResponse([]);
+      return jsonResponse([], 201);
+    }
+    if (value.includes("/rest/v1/vovyyvov_opportunities?on_conflict=source_provider,source_id")) {
+      const body = JSON.parse(init.body);
+      return jsonResponse(body, 201);
+    }
+    if (value.includes("/rest/v1/vovyyvov_opportunities?source_provider=eq.")) {
+      return jsonResponse([]);
+    }
+    if (value.includes("/rest/v1/vovyyvov_opportunities?external=eq.true&status=eq.OPEN&expires_at=lt.")) {
+      return jsonResponse([]);
+    }
+    if (value.includes("/rest/v1/vovyyvov_opportunity_sync_runs?id=eq.run-1")) {
+      return jsonResponse([], 200);
+    }
+    throw new Error(`Unexpected fetch ${value}`);
+  });
+
+  const result = await syncExternalOpportunities(
+    {
+      SUPABASE_URL: "https://supabase.test",
+      SUPABASE_ANON_KEY: "anon",
+      SUPABASE_SERVICE_ROLE_KEY: "service",
+    },
+    { trigger: "test" }
+  );
+
+  assert.equal(result.status, "SUCCESS");
+  assert.equal(result.upserted_count, 2);
+  assert.equal(result.duplicate_count, 1);
+  assert.ok(calls.some((call) => call.url.includes("nominatim.openstreetmap.org")));
+});
+
+test("worker discovery endpoint returns public opportunities", async () => {
+  setMockFetch(async (url) => {
+    const value = String(url);
+    if (value.includes("/rest/v1/vovyyvov_opportunities?select=")) {
+      return jsonResponse([
+        {
+          id: "opp-1",
+          title: "Warehouse shift",
+          description: "Today",
+          amount: 95,
+          city: "Newark",
+          country: "United States",
+          remote: false,
+          status: "OPEN",
+          kind: "SHIFT",
+          company_name: "Acme",
+          source_provider: "krevuno",
+          source_id: null,
+          source_url: null,
+          location_text: "Newark, United States",
+          latitude: 40.7357,
+          longitude: -74.1724,
+          employment_type: "temporary",
+          salary_text: "$95",
+          currency: "USD",
+          skills: ["warehouse"],
+          tags: ["inventory"],
+          classification: {},
+          external: false,
+          public_visibility: true,
+          map_visibility: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          expires_at: null,
+          last_seen_at: new Date().toISOString(),
+          search_radius_miles: 25,
+        },
+      ]);
+    }
+    throw new Error(`Unexpected fetch ${value}`);
+  });
+
+  const response = await worker.fetch(
+    new Request("https://example.com/api/opportunities/discover?lat=40.73&lng=-74.0&radius_miles=20"),
+    {
+      SUPABASE_URL: "https://supabase.test",
+      SUPABASE_ANON_KEY: "anon",
+    }
+  );
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.opportunities.length, 1);
+  assert.equal(body.opportunities[0].title, "Warehouse shift");
+});
