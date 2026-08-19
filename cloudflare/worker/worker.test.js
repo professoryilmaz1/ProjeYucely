@@ -21,6 +21,10 @@ function setMockFetch(handler) {
   globalThis.fetch = handler;
 }
 
+function requestUrl(value) {
+  return new URL(String(value));
+}
+
 test.after(() => {
   globalThis.fetch = originalFetch;
 });
@@ -116,7 +120,8 @@ test("syncExternalOpportunities normalizes feeds and writes sync state", async (
   setMockFetch(async (url, init = {}) => {
     calls.push({ url: String(url), method: init.method || "GET" });
     const value = String(url);
-    if (value.includes("remotive.com/api/remote-jobs")) {
+    const parsed = requestUrl(url);
+    if (parsed.hostname === "remotive.com" && parsed.pathname === "/api/remote-jobs") {
       return jsonResponse({
         jobs: [
           {
@@ -131,7 +136,7 @@ test("syncExternalOpportunities normalizes feeds and writes sync state", async (
         ],
       });
     }
-    if (value.includes("arbeitnow.com/api/job-board-api")) {
+    if (parsed.hostname === "www.arbeitnow.com" && parsed.pathname === "/api/job-board-api") {
       return jsonResponse({
         data: [
           {
@@ -146,10 +151,10 @@ test("syncExternalOpportunities normalizes feeds and writes sync state", async (
         ],
       });
     }
-    if (value.includes("jobicy.com/api/v2/remote-jobs")) {
+    if (parsed.hostname === "jobicy.com" && parsed.pathname === "/api/v2/remote-jobs") {
       return jsonResponse({ jobs: [] });
     }
-    if (value.includes("remoteok.com/api")) {
+    if (parsed.hostname === "remoteok.com" && parsed.pathname === "/api") {
       return jsonResponse([
         { legal: "meta" },
         {
@@ -163,7 +168,7 @@ test("syncExternalOpportunities normalizes feeds and writes sync state", async (
         },
       ]);
     }
-    if (value.includes("nominatim.openstreetmap.org")) {
+    if (parsed.hostname === "nominatim.openstreetmap.org") {
       return jsonResponse([
         {
           lat: "52.5200",
@@ -207,13 +212,14 @@ test("syncExternalOpportunities normalizes feeds and writes sync state", async (
   assert.equal(result.status, "SUCCESS");
   assert.equal(result.upserted_count, 2);
   assert.equal(result.duplicate_count, 1);
-  assert.ok(calls.some((call) => call.url.includes("nominatim.openstreetmap.org")));
+  assert.ok(calls.some((call) => requestUrl(call.url).hostname === "nominatim.openstreetmap.org"));
 });
 
 test("worker discovery endpoint returns public opportunities", async () => {
   setMockFetch(async (url) => {
     const value = String(url);
-    if (value.includes("/rest/v1/vovyyvov_opportunities?select=")) {
+    const parsed = requestUrl(url);
+    if (parsed.pathname === "/rest/v1/vovyyvov_opportunities" && parsed.search.includes("select=")) {
       return jsonResponse([
         {
           id: "opp-1",

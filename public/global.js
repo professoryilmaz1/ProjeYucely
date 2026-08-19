@@ -1,5 +1,5 @@
-const GEO_KEY = "vovyyvov_geo_v1";
-const geoState = JSON.parse(localStorage.getItem(GEO_KEY) || '{"lat":20,"lng":0,"radius":25,"located":false}');
+const geoState = window.__KREVUNO_GEO_STATE__ || { lat: 20, lng: 0, radius: 25, located: false };
+window.__KREVUNO_GEO_STATE__ = geoState;
 const countryLang = {US:"en",GB:"en",IE:"en",CA:"en",AU:"en",NZ:"en",TR:"tr",DE:"de",AT:"de",CH:"de",FR:"fr",BE:"fr",ES:"es",MX:"es",AR:"es",CO:"es",CL:"es",PE:"es",BR:"pt",PT:"pt",IT:"it",NL:"nl",PL:"pl",CZ:"cs",SK:"sk",HU:"hu",RO:"ro",BG:"bg",GR:"el",UA:"uk",RU:"ru",SE:"sv",NO:"no",DK:"da",FI:"fi",EE:"et",LV:"lv",LT:"lt",JP:"ja",KR:"ko",CN:"zh-CN",TW:"zh-TW",HK:"zh-TW",IN:"hi",PK:"ur",BD:"bn",ID:"id",MY:"ms",PH:"tl",TH:"th",VN:"vi",SA:"ar",AE:"ar",QA:"ar",KW:"ar",EG:"ar",MA:"ar",DZ:"ar",IL:"iw",IR:"fa",ZA:"en",NG:"en",KE:"en",TZ:"sw",ET:"am"};
 let autoLanguage = preferredLanguage();
 let activityLayer = null;
@@ -121,7 +121,8 @@ function initMap() {
   if (value) value.textContent = `${geoState.radius} mi`;
 
   function emitGeo() {
-    const detail = { ...geoState };
+    window.__KREVUNO_GEO_STATE__ = { ...geoState };
+    const detail = { ...window.__KREVUNO_GEO_STATE__ };
     window.dispatchEvent(new CustomEvent("vovyyvov:geo-change", { detail }));
     window.dispatchEvent(new CustomEvent("krevuno:geo-change", { detail }));
   }
@@ -130,7 +131,6 @@ function initMap() {
     geoState.lat = lat;
     geoState.lng = lng;
     geoState.located = located;
-    localStorage.setItem(GEO_KEY, JSON.stringify(geoState));
     centerMarker.setLatLng([lat, lng]);
     radiusCircle.setLatLng([lat, lng]);
     emitGeo();
@@ -140,7 +140,6 @@ function initMap() {
     geoState.radius = Math.max(5, Math.min(500, Number(v) || 25));
     if (value) value.textContent = `${geoState.radius} mi`;
     radiusCircle.setRadius(geoState.radius * 1609.344);
-    localStorage.setItem(GEO_KEY, JSON.stringify(geoState));
     emitGeo();
   }
 

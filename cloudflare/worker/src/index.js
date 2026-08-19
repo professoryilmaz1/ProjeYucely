@@ -135,6 +135,12 @@ function parseAmount(value) {
   return Number.isFinite(numeric) ? Number(numeric.toFixed(2)) : null;
 }
 
+function readOptionalNumber(value) {
+  if (value == null || value === "") return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
 function maybeDate(value) {
   if (value == null || value === "") return null;
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -991,8 +997,8 @@ export async function syncExternalOpportunities(env, options = {}) {
 
 async function buildDiscoveryResponse(env, url) {
   const limit = clamp(Number(url.searchParams.get("limit") || DEFAULT_DISCOVERY_LIMIT), 1, 250);
-  const lat = Number(url.searchParams.get("lat"));
-  const lng = Number(url.searchParams.get("lng"));
+  const lat = readOptionalNumber(url.searchParams.get("lat"));
+  const lng = readOptionalNumber(url.searchParams.get("lng"));
   const radiusMiles = clamp(
     Number(url.searchParams.get("radius_miles") || DEFAULT_RADIUS_MILES),
     5,
@@ -1001,7 +1007,14 @@ async function buildDiscoveryResponse(env, url) {
   const skillFilter = splitCsv(url.searchParams.get("skills"));
   const geo =
     Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng, radiusMiles } : null;
-  const rows = await listPublicOpportunities(env, { limit: Math.max(limit, 120) });
+  let rows = [];
+  let degraded = null;
+  try {
+    rows = await listPublicOpportunities(env, { limit: Math.max(limit, 120) });
+  } catch (error) {
+    degraded = error.message;
+    observe("opportunity.discovery_degraded", { message: error.message });
+  }
   const opportunities = rows
     .filter((opportunity) => opportunityStillOpen(opportunity))
     .map((opportunity) => mapOpportunityWithDistance(opportunity, geo))
@@ -1026,6 +1039,7 @@ async function buildDiscoveryResponse(env, url) {
     .slice(0, limit);
   return {
     ok: true,
+    degraded,
     opportunities,
     filters: {
       lat: geo?.lat ?? null,
@@ -1038,9 +1052,17 @@ async function buildDiscoveryResponse(env, url) {
 
 async function buildMapResponse(env, url) {
   const limit = clamp(Number(url.searchParams.get("limit") || DEFAULT_MAP_LIMIT), 1, 500);
-  const rows = await listMapOpportunities(env, { limit });
+  let rows = [];
+  let degraded = null;
+  try {
+    rows = await listMapOpportunities(env, { limit });
+  } catch (error) {
+    degraded = error.message;
+    observe("opportunity.map_degraded", { message: error.message });
+  }
   return {
     ok: true,
+    degraded,
     opportunities: rows
       .filter((opportunity) => opportunityStillOpen(opportunity))
       .filter(
@@ -1073,8 +1095,8 @@ async function buildMatchesResponse(env, requestUrl, request) {
   const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
   if (!token) throw new Error("AUTH_REQUIRED");
   const user = await fetchSupabaseUser(env, token);
-  const lat = Number(requestUrl.searchParams.get("lat"));
-  const lng = Number(requestUrl.searchParams.get("lng"));
+  const lat = readOptionalNumber(requestUrl.searchParams.get("lat"));
+  const lng = readOptionalNumber(requestUrl.searchParams.get("lng"));
   const radiusMiles = clamp(
     Number(requestUrl.searchParams.get("radius_miles") || DEFAULT_RADIUS_MILES),
     5,

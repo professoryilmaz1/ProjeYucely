@@ -4,12 +4,19 @@ const SUPABASE_KEY = "sb_publishable_GQLUsMvxJ4-TgdxtAD3WXw_aKpp5Qm2";
 const storeKey = "vovyyvov_state_v2";
 const sessionKey = "vovyyvov_supabase_session";
 const pendingKey = "vovyyvov_pending_onboarding";
-const geoKey = "vovyyvov_geo_v1";
+const defaultGeo = { lat: 20, lng: 0, radius: 25, located: false };
 const state = JSON.parse(localStorage.getItem(storeKey) || '{"needs":[],"availability":[],"plans":0}');
-let session = JSON.parse(localStorage.getItem(sessionKey) || "null");
+let session = (() => {
+  try {
+    return JSON.parse(sessionStorage.getItem(sessionKey) || localStorage.getItem(sessionKey) || "null");
+  } catch {
+    return null;
+  }
+})();
 let remoteReady = false;
 let remoteOpportunities = [];
 let matchedOpportunities = [];
+let liveGeo = window.__KREVUNO_GEO_STATE__ ? { ...window.__KREVUNO_GEO_STATE__ } : { ...defaultGeo };
 
 const money = (n) =>
   new Intl.NumberFormat("en-US", {
@@ -42,11 +49,7 @@ function setHtml(id, value) {
 }
 
 function geo() {
-  try {
-    return JSON.parse(localStorage.getItem(geoKey) || "null");
-  } catch {
-    return null;
-  }
+  return window.__KREVUNO_GEO_STATE__ ? { ...window.__KREVUNO_GEO_STATE__ } : { ...liveGeo };
 }
 
 function persist() {
@@ -113,8 +116,9 @@ async function worker(path, { headers = {} } = {}) {
 
 function setSession(next) {
   session = next;
-  if (session) localStorage.setItem(sessionKey, JSON.stringify(session));
-  else localStorage.removeItem(sessionKey);
+  if (session) sessionStorage.setItem(sessionKey, JSON.stringify(session));
+  else sessionStorage.removeItem(sessionKey);
+  localStorage.removeItem(sessionKey);
   renderAuth();
 }
 
@@ -641,15 +645,9 @@ if (langBtn) {
 }
 
 window.addEventListener("krevuno:geo-change", () => {
+  liveGeo = window.__KREVUNO_GEO_STATE__ ? { ...window.__KREVUNO_GEO_STATE__ } : liveGeo;
   renderEarn();
   loadRemote().catch(() => {});
-});
-
-window.addEventListener("storage", (event) => {
-  if (event.key === geoKey) {
-    renderEarn();
-    loadRemote().catch(() => {});
-  }
 });
 
 render();

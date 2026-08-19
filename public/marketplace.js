@@ -5,7 +5,7 @@ const $ = (s) => document.querySelector(s);
 
 function session() {
   try {
-    return JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+    return JSON.parse(sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY) || "null");
   } catch {
     return null;
   }
@@ -99,20 +99,12 @@ function setup() {
             },
           });
           if (!out.access_token) {
-            localStorage.setItem(
-              "vovyyvov_pending_onboarding",
-              JSON.stringify({
-                accountType,
-                displayName,
-                dob,
-                businessName: String(form.get("business_name") || ""),
-              })
-            );
             const message = $("#authMessage");
             if (message) message.textContent = "Account created. Confirm your email if requested, then sign in to finish onboarding.";
             return;
           }
-          localStorage.setItem(SESSION_KEY, JSON.stringify(out));
+          sessionStorage.setItem(SESSION_KEY, JSON.stringify(out));
+          localStorage.removeItem(SESSION_KEY);
           await api("/rest/v1/vovyyvov_profiles?on_conflict=user_id", {
             method: "POST",
             token: out.access_token,
