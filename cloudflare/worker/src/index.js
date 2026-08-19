@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/cloudflare";
+import { runIngestion, rankOpportunities } from "./ingest.js";
 
 const SENTRY_DSN =
   "https://da4e27baed26868fdb8051b050789a8a@o4511888786915328.ingest.us.sentry.io/4511888807100416";
@@ -615,6 +616,96 @@ const worker = {
       );
     }
 
+    // -----------------------------------------------------------------------
+    // POST /api/ingest  — admin-gated manual trigger for the ingestion worker
+    // -----------------------------------------------------------------------
+    if (request.method === "POST" && url.pathname === "/api/ingest") {
+      if (!isAdminRequest(request, env)) {
+        return securityHeaders(json({ error: "UNAUTHORIZED" }, 401));
+      }
+
+      let sources;
+      try {
+        const body = await request.json().catch(() => ({}));
+        sources = Array.isArray(body.sources) ? body.sources : undefined;
+      } catch {
+        sources = undefined;
+      }
+
+      try {
+        const result = await runIngestion(env, { sources });
+        return securityHeaders(json({ ok: true, ...result }));
+      } catch (e) {
+        console.error("krevuno /api/ingest error", e?.message);
+        return securityHeaders(
+          json({ ok: false, error: e?.message ?? "ingestion_failed" }, 500)
+        );
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /api/match  — AI skill/location matching against open opportunities
+    // Body: { skills: string[], lat?: number, lng?: number, radiusMiles?: number, limit?: number }
+    // Returns: ranked opportunity list with _match scores
+    // -----------------------------------------------------------------------
+    if (request.method === "POST" && url.pathname === "/api/match") {
+      let userProfile = {};
+      try {
+        userProfile = await request.json().catch(() => ({}));
+      } catch {
+        userProfile = {};
+      }
+
+      const supabaseUrl = env.SUPABASE_URL;
+      const supabaseKey = env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseKey) {
+        return securityHeaders(
+          json({ ok: false, error: "SUPABASE_NOT_CONFIGURED" }, 503)
+        );
+      }
+
+      try {
+        const limit = Math.min(Number(userProfile.limit ?? 100), 200);
+        const resp = await fetch(
+          `${supabaseUrl}/rest/v1/vovyyvov_opportunities?select=id,title,description,company,city,country,remote,amount,salary_min,salary_max,tags,ai_labels,kind,source,source_url,latitude,longitude,expires_at,created_at&status=eq.OPEN&order=created_at.desc&limit=${limit}`,
+          {
+            headers: {
+              apikey: supabaseKey,
+              authorization: `******`,
+              accept: "application/json",
+            },
+            signal: AbortSignal.timeout(10_000),
+          }
+        );
+
+        if (!resp.ok) {
+          throw new Error(`Supabase fetch HTTP ${resp.status}`);
+        }
+
+        const opportunities = await resp.json();
+        const ranked = rankOpportunities(opportunities, {
+          skills: Array.isArray(userProfile.skills) ? userProfile.skills : [],
+          lat: Number(userProfile.lat ?? NaN),
+          lng: Number(userProfile.lng ?? NaN),
+          radiusMiles: Number(userProfile.radiusMiles ?? 25),
+        });
+
+        return securityHeaders(
+          json({
+            ok: true,
+            count: ranked.length,
+            opportunities: ranked,
+          })
+        );
+      } catch (e) {
+        console.error("krevuno /api/match error", e?.message);
+        return securityHeaders(
+          json({ ok: false, error: e?.message ?? "match_failed" }, 500)
+        );
+      }
+    }
+
     if (url.pathname.startsWith("/v1/")) {
       return securityHeaders(
         json(
@@ -641,6 +732,27 @@ const worker = {
         },
         404
       )
+    );
+  },
+
+  // -------------------------------------------------------------------------
+  // Scheduled handler — Cloudflare Cron Trigger, runs every hour
+  // -------------------------------------------------------------------------
+  async scheduled(event, env, ctx) {
+    console.log(
+      `krevuno-ingest scheduled start cron=${event.cron} t=${event.scheduledTime}`
+    );
+
+    ctx.waitUntil(
+      runIngestion(env)
+        .then((result) => {
+          console.log(
+            `krevuno-ingest scheduled done fetched=${result.total_fetched} upserted=${result.total_upserted} errors=${result.total_errors} ms=${result.elapsed_ms}`
+          );
+        })
+        .catch((e) => {
+          console.error("krevuno-ingest scheduled error", e?.message);
+        })
     );
   },
 };
