@@ -210,8 +210,12 @@ export function classifyOpportunityHeuristic(opportunity = {}) {
     ...asArray(opportunity.category),
     ...asArray(opportunity.candidate_required_location),
   ]);
-  const remote = parseBoolean(opportunity.remote) || isRemoteLocation(opportunity.location_text) || isRemoteLocation(tags.join(" "));
   const haystack = normalizeToken([title, description, tags.join(" ")].join(" "));
+  const remote =
+    parseBoolean(opportunity.remote) ||
+    isRemoteLocation(opportunity.location_text) ||
+    isRemoteLocation(tags.join(" ")) ||
+    /\bremote\b|\bworldwide\b|\banywhere\b/.test(haystack);
   let kind = "JOB";
   if (/gig|task|freelance|contract|project/.test(haystack)) kind = "GIG";
   if (/shift|hourly|same day|weekend/.test(haystack)) kind = "SHIFT";
@@ -809,7 +813,7 @@ async function normalizeExternalOpportunity(provider, raw, env, nowIso, geoMemo)
         normalizeToken(companyName),
         normalizeToken(parsedLocation.city),
         normalizeToken(parsedLocation.country),
-        normalizeToken(sourceUrl),
+        normalizeToken(base.employment_type),
       ].join("|")
     ),
     search_radius_miles: base.remote ? null : DEFAULT_RADIUS_MILES,
