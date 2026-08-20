@@ -1,0 +1,64 @@
+const $=(s)=>document.querySelector(s);
+const regionNames=(()=>{try{return new Intl.DisplayNames(['en'],{type:'region'})}catch{return null}})();
+const STATES={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',DC:'District of Columbia'};
+const COUNTRY_PHRASES=[['united arab emirates','United Arab Emirates'],['united kingdom','United Kingdom'],['united states','United States'],['new zealand','New Zealand'],['south africa','South Africa'],['canada','Canada'],['turkey','Turkey'],['turkiye','Turkey'],['türkiye','Turkey'],['germany','Germany'],['france','France'],['italy','Italy'],['spain','Spain'],['netherlands','Netherlands'],['australia','Australia'],['india','India'],['mexico','Mexico'],['brazil','Brazil'],['japan','Japan'],['singapore','Singapore'],['uae','United Arab Emirates'],['usa','United States']];
+let browserGeo=null;
+
+const esc=(v)=>String(v??'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeUrl=(v)=>{try{const u=new URL(String(v||''));return /^https?:$/.test(u.protocol)?u.toString():''}catch{return''}};
+function countryName(v){const raw=String(v||'').trim();if(!raw)return'';if(raw.length===2&&regionNames){try{return regionNames.of(raw.toUpperCase())||raw.toUpperCase()}catch{}}return raw}
+function payText(o){const salary=String(o?.salary_text||'').trim();if(salary)return salary;const n=Number(o?.amount);if(Number.isFinite(n)&&n>0){try{return new Intl.NumberFormat('en-US',{style:'currency',currency:String(o?.currency||'USD').toUpperCase(),maximumFractionDigits:0}).format(n)}catch{return '$'+Math.round(n).toLocaleString('en-US')}}return'Pay not listed'}
+function normalize(v){return String(v||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
+function parseNatural(text){
+  const raw=String(text||'');
+  const normalized=normalize(raw);
+  const words=normalized.split(/\s+/).filter(Boolean);
+  const turkish=/\b(is|iş|ariyorum|arıyorum|muhendis|mühendis|muhendislik|mühendislik|yakinimda|yakınımda)\b/i.test(raw);
+  let state='';
+  for(const word of words){
+    const code=word.toUpperCase();
+    if(!STATES[code])continue;
+    if(turkish&&word==='de')continue;
+    if(word==='in')continue;
+    state=code;break;
+  }
+  if(!state){const padded=' '+normalized+' ';for(const [code,name] of Object.entries(STATES)){if(padded.includes(' '+normalize(name)+' ')){state=code;break}}}
+  const zip=raw.match(/\b\d{5}(?:-\d{4})?\b/)?.[0]||'';
+  let country='';let stripped=' '+normalized+' ';
+  for(const [phrase,name] of COUNTRY_PHRASES){const n=normalize(phrase);if(stripped.includes(' '+n+' ')){country=name;stripped=stripped.replace(' '+n+' ',' ');break}}
+  if(state)stripped=stripped.replace(new RegExp(`\\b${state.toLowerCase()}\\b`,'g'),' ');
+  if(zip)stripped=stripped.replace(zip,' ');
+  const stop=new Set(['i','am','a','an','the','looking','look','for','find','want','need','job','jobs','work','position','positions','opportunity','opportunities','near','me','in','at','around','please','is','iş','ariyorum','arıyorum','bakiyorum','bakıyorum','istiyorum','de','da','bir','bana','icin','için','varmi','var','mi']);
+  const query=stripped.split(/\s+/).filter((w)=>w&&!stop.has(w)).join(' ').trim();
+  return{state,zip,country,query};
+}
+function getSession(){try{return JSON.parse(sessionStorage.getItem('vovyyvov_supabase_session')||localStorage.getItem('vovyyvov_supabase_session')||'null')}catch{return null}}
+function setStatus(text){const n=$('#searchStatus');if(n)n.textContent=text}
+function syncUrl(){const p=new URLSearchParams();[['q','#naturalSearch'],['occupation','#professionInput'],['country','#countryInput'],['location','#locationInput']].forEach(([key,sel])=>{const v=$(sel)?.value?.trim();if(v)p.set(key,v)});const radius=$('#radiusInput')?.value;if(radius)p.set('radius_miles',radius);history.replaceState(null,'',location.pathname+(p.toString()?'?'+p.toString():''))}
+function fillFromUrl(){const p=new URLSearchParams(location.search);$('#naturalSearch').value=p.get('q')||'';$('#professionInput').value=p.get('occupation')||'';$('#countryInput').value=p.get('country')||'';$('#locationInput').value=p.get('location')||'';$('#radiusInput').value=p.get('radius_miles')||'25';$('#radiusLabel').textContent=$('#radiusInput').value+' mi'}
+function render(rows,filters){const list=$('#searchResults');const summary=$('#resultSummary');if(!list)return;if(!Array.isArray(rows)||!rows.length){list.innerHTML='<div class="empty">No live opportunities matched this search. Try a wider radius, another profession, or remove one filter.</div>';if(summary)summary.textContent='0 results';return}if(summary){const f=[];if(filters?.terms?.length)f.push(filters.terms.join(', '));if(filters?.state)f.push(filters.state);if(filters?.country)f.push(countryName(filters.country));if(filters?.zip)f.push('ZIP '+filters.zip);if(filters?.radius_miles)f.push(filters.radius_miles+' mi');summary.textContent=`${rows.length} live results${f.length?' • '+f.join(' • '):''}`}
+  list.innerHTML=rows.map((o)=>{const loc=o.remote?'Remote'+([o.city,countryName(o.country)].filter(Boolean).length?' • '+[o.city,countryName(o.country)].filter(Boolean).join(', '):''):(o.distance_miles!=null?`${Number(o.distance_miles).toFixed(Number(o.distance_miles)<10?1:0)} mi away • `:'')+([o.city,countryName(o.country)].filter(Boolean).join(', ')||o.location_text||'Location not listed');const provider=[o.company_name,o.source_provider].filter(Boolean).join(' • ');const href=safeUrl(o.source_url);return `<article class="search-result"><div><span class="result-kind">${esc(o.employment_type||o.kind||'JOB')}</span><h3>${esc(o.title||'Opportunity')}</h3><p><strong>${esc(payText(o))}</strong> • ${esc(loc)}</p><p class="result-source">${esc(provider)}</p></div>${href?`<a class="market-cta" href="${esc(href)}" target="_blank" rel="noopener noreferrer">VIEW / APPLY</a>`:''}</article>`}).join('')}
+async function runSearch(){
+  const natural=$('#naturalSearch')?.value?.trim()||'';
+  const occupation=$('#professionInput')?.value?.trim()||'';
+  const countryField=$('#countryInput')?.value?.trim()||'';
+  const locationText=$('#locationInput')?.value?.trim()||'';
+  const parsed=parseNatural(`${natural} ${locationText}`);
+  const p=new URLSearchParams({limit:'100'});
+  const cleanedQuery=parseNatural(natural).query;
+  if(cleanedQuery)p.set('q',cleanedQuery);
+  if(occupation)p.set('occupation',occupation);
+  const effectiveCountry=countryField||parsed.country;
+  if(effectiveCountry)p.set('country',effectiveCountry);
+  if(locationText&&locationText!=='Near my current location')p.set('location',locationText);
+  if(parsed.state)p.set('state',parsed.state);
+  if(parsed.zip)p.set('zip',parsed.zip);
+  p.set('radius_miles',$('#radiusInput')?.value||'25');
+  if(browserGeo){p.set('lat',String(browserGeo.lat));p.set('lng',String(browserGeo.lng))}
+  setStatus('Searching live KREVUNO opportunities…');
+  const session=getSession();const headers={accept:'application/json'};let endpoint='/api/opportunities/discover?'+p.toString();
+  if(session?.access_token){endpoint='/api/opportunities/matches?'+p.toString();headers.authorization='Bearer '+session.access_token}
+  try{let r=await fetch(endpoint,{headers,cache:'no-store'});if(!r.ok&&session?.access_token)r=await fetch('/api/opportunities/discover?'+p.toString(),{headers:{accept:'application/json'},cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const data=await r.json();render(data.opportunities||[],data.filters||{});setStatus('Live search active • results come from current public opportunity feeds');syncUrl()}catch(e){setStatus('Search temporarily unavailable. Please try again.');$('#searchResults').innerHTML=`<div class="empty">${esc(e.message||e)}</div>`}}
+function setupAuthDialog(){const d=$('#authDialog');const open=(target)=>{if(!d)return;if(typeof d.showModal==='function'&&!d.open)d.showModal();else d.setAttribute('open','');setTimeout(()=>$(target)?.focus(),80)};[['#navSignIn','#loginForm input[name=email]'],['#navSignUp','#signupForm input[name=display_name]'],['#navProfile','#profilePanel']].forEach(([button,target])=>$(button)?.addEventListener('click',(e)=>{e.preventDefault();e.stopImmediatePropagation();open(target)},true));$('#authClose')?.addEventListener('click',()=>d?.close())}
+
+fillFromUrl();setupAuthDialog();$('#radiusInput')?.addEventListener('input',(e)=>{$('#radiusLabel').textContent=e.target.value+' mi'});$('#marketSearchForm')?.addEventListener('submit',(e)=>{e.preventDefault();browserGeo=null;runSearch()});$('#useLocationSearch')?.addEventListener('click',()=>{if(!navigator.geolocation){setStatus('Location is not supported by this browser.');return}setStatus('Getting your approximate location…');navigator.geolocation.getCurrentPosition((pos)=>{browserGeo={lat:pos.coords.latitude,lng:pos.coords.longitude};$('#locationInput').value='Near my current location';runSearch()},()=>setStatus('Location permission was not granted. You can search by ZIP, city or state instead.'),{enableHighAccuracy:false,timeout:10000,maximumAge:300000})});document.querySelectorAll('[data-search-example]').forEach((b)=>b.addEventListener('click',()=>{$('#naturalSearch').value=b.dataset.searchExample||'';browserGeo=null;runSearch()}));runSearch();

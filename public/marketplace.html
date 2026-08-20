@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <title>KREVUNO Marketplace — Search live work</title>
+  <meta name="description" content="Search live KREVUNO opportunities by profession, country, city, state, ZIP code, distance and remote work.">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/global.css">
+  <style>
+    .market-shell{max-width:1180px;margin:0 auto;padding:28px 18px 60px}.market-hero{padding:20px 0 8px}.market-hero h1{margin:.2rem 0 .5rem}.search-panel{display:grid;gap:14px;margin:18px 0}.search-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px}.search-grid input,.search-grid select{width:100%;padding:12px;border-radius:10px;border:1px solid #d1d5db}.search-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.search-actions button{padding:11px 15px}.radius-line{display:flex;gap:10px;align-items:center}.radius-line input{width:180px}.example-row{display:flex;gap:8px;flex-wrap:wrap}.example-row button{border:1px solid #d1d5db;border-radius:999px;background:white;padding:7px 11px}.results-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin:22px 0 12px}.results{display:grid;gap:12px}.search-result{display:flex;justify-content:space-between;gap:18px;align-items:center;padding:18px;border:1px solid #e5e7eb;border-radius:14px;background:#fff}.search-result h3{margin:.2rem 0 .4rem}.search-result p{margin:.25rem 0}.result-kind{font-size:.75rem;font-weight:800;letter-spacing:.05em;opacity:.7}.result-source{opacity:.72;font-size:.9rem}.market-cta{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:800;border:1px solid currentColor;white-space:nowrap}.back-link{text-decoration:none;font-weight:800}.auth-dialog{width:min(860px,calc(100vw - 28px));max-height:90vh;overflow:auto;border:0;border-radius:18px;padding:0;box-shadow:0 24px 70px rgba(0,0,0,.28)}.auth-dialog::backdrop{background:rgba(15,23,42,.55)}.auth-shell{padding:22px}.auth-close{float:right;border:0;background:transparent;font-size:26px;line-height:1;cursor:pointer}@media(max-width:900px){.search-grid{grid-template-columns:1fr 1fr}}@media(max-width:620px){.search-grid{grid-template-columns:1fr}.search-result{display:block}.market-cta{margin-top:10px;width:100%}}
+  </style>
+</head>
+<body data-page="marketplace">
+<header class="nav">
+  <div class="brand"><span class="mark">KR</span><div><strong>KREVUNO</strong><small>Marketplace</small></div></div>
+  <div class="navright">
+    <a class="back-link" href="/">HOME</a>
+    <button id="navSignIn" class="ghost" type="button">SIGN IN</button>
+    <button id="navSignUp" class="ghost" type="button">SIGN UP</button>
+    <button id="navProfile" class="ghost" type="button" hidden>PROFILE</button>
+    <button id="logoutBtn" class="ghost" type="button" hidden>LOG OUT</button>
+  </div>
+</header>
+
+<main class="market-shell">
+  <section class="market-hero">
+    <div class="eyebrow">KREVUNO MARKETPLACE</div>
+    <h1>Search real opportunities without scrolling through the home page.</h1>
+    <p>Use normal language or search directly by profession, country, city/state/ZIP and distance. Remote work is included when relevant.</p>
+  </section>
+
+  <section class="card search-panel">
+    <form id="marketSearchForm">
+      <div class="search-grid">
+        <input id="naturalSearch" placeholder="Natural search: engineering jobs in NJ, iş arıyorum, nurse jobs near me">
+        <input id="professionInput" placeholder="Profession / skill">
+        <input id="countryInput" list="countryList" placeholder="Country">
+        <input id="locationInput" placeholder="City, state or ZIP">
+      </div>
+      <datalist id="countryList"><option value="United States"><option value="Canada"><option value="United Kingdom"><option value="Turkey"><option value="Germany"><option value="France"><option value="Italy"><option value="Spain"><option value="Australia"><option value="New Zealand"><option value="India"><option value="United Arab Emirates"></datalist>
+      <div class="search-actions">
+        <button type="submit">SEARCH LIVE JOBS</button>
+        <button id="useLocationSearch" type="button">USE MY LOCATION</button>
+        <label class="radius-line">Radius <input id="radiusInput" type="range" min="5" max="250" step="5" value="25"><strong id="radiusLabel">25 mi</strong></label>
+      </div>
+    </form>
+    <div class="example-row"><button type="button" data-search-example="engineering jobs in NJ">Engineering in NJ</button><button type="button" data-search-example="muhendislik ariyorum">Mühendislik</button><button type="button" data-search-example="nurse jobs in Canada">Nurse in Canada</button><button type="button" data-search-example="work near 07005">ZIP 07005</button></div>
+    <div id="searchStatus" class="empty small">Preparing live search…</div>
+  </section>
+
+  <section>
+    <div class="results-head"><div><div class="eyebrow">LIVE RESULTS</div><h2 id="resultSummary">Loading…</h2></div><a class="back-link" href="/">← Back to KREVUNO</a></div>
+    <div id="searchResults" class="results"><div class="empty">Loading current opportunities…</div></div>
+  </section>
+</main>
+
+<dialog id="authDialog" class="auth-dialog">
+  <div class="auth-shell">
+    <button id="authClose" class="auth-close" type="button" aria-label="Close">×</button>
+    <article id="accountCard" class="card">
+      <div class="title"><h2>Account</h2><span id="authBadge" class="badge">GUEST</span></div>
+      <div id="authMessage" class="empty small">18+ launch. Personal membership is free. Business signup is free.</div>
+      <div id="profilePanel" hidden></div>
+      <div id="authForms" class="grid two">
+        <form id="loginForm" class="stack"><h3>Sign in</h3><input name="email" type="email" placeholder="Email" required><input name="password" type="password" minlength="10" placeholder="Password" required><button>Sign in</button></form>
+        <form id="signupForm" class="stack"><h3>Create free account</h3><select id="accountType" name="account_type"><option value="PERSONAL">Personal — FREE</option><option value="BUSINESS_REP">Business / Organization — FREE signup</option></select><input name="display_name" placeholder="Your name" required><input name="date_of_birth" type="date" required><input name="email" type="email" placeholder="Email" required><input name="password" type="password" minlength="10" placeholder="Create password" required><input id="businessName" name="business_name" placeholder="Business / organization name" hidden><label class="small"><input name="recruiter_contact_opt_in" type="checkbox"> Allow verified businesses to contact me directly about relevant opportunities</label><button>Create free account</button></form>
+      </div>
+      <span id="identityStatus" hidden></span><span id="dataStatus" hidden></span><span id="marketBadge" hidden></span>
+    </article>
+  </div>
+</dialog>
+
+<footer>© 2026 IMPOCOR GROUP LLC • KREVUNO</footer>
+<script type="module" src="/marketplace.js"></script>
+<script type="module" src="/app.js"></script>
+<script type="module" src="/search.js"></script>
+</body>
+</html>
