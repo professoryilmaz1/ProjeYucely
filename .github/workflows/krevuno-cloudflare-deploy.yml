@@ -45,6 +45,7 @@ jobs:
           node --check cloudflare/worker/src/index.js
           node --check cloudflare/worker/src/ingest.js
           node --check cloudflare/worker/src/country-ingest.js
+          node --check cloudflare/worker/src/world-country-sweep.js
           node --check cloudflare/worker/src/runtime.js
           npx wrangler deploy --dry-run
 
