@@ -42,7 +42,7 @@ jobs:
       - name: Cloudflare bundle dry run
         run: npx wrangler deploy --dry-run
 
-      - name: Auth UI and scheduled-ingestion contract checks
+      - name: Auth UI and global-ingestion contract checks
         run: |
           node - <<'NODE'
           const fs = require('fs');
@@ -52,24 +52,20 @@ jobs:
           const wrangler = fs.readFileSync('wrangler.jsonc', 'utf8');
           const countryIngest = fs.readFileSync('cloudflare/worker/src/country-ingest.js', 'utf8');
           const required = ['navSignIn','navSignUp','navProfile','logoutBtn','accountCard','loginForm','signupForm','profilePanel'];
-          for (const id of required) {
-            if (!html.includes(`id="${id}"`)) throw new Error(`Missing UI id: ${id}`);
-          }
+          for (const id of required) if (!html.includes(`id="${id}"`)) throw new Error(`Missing UI id: ${id}`);
           const forbidden = ['google_translate_element','id="langBtn"','>Language<','EN / TR'];
-          for (const value of forbidden) {
-            if (html.includes(value)) throw new Error(`Legacy language control remains: ${value}`);
-          }
-          if (global.includes('translate.google.com') || global.includes('googleTranslateElementInit')) {
-            throw new Error('Legacy translation runtime remains in global.js');
-          }
-          for (const field of ['business_name','recruiter_contact_opt_in','account_type','date_of_birth']) {
-            if (!marketplace.includes(field)) throw new Error(`Signup metadata missing: ${field}`);
-          }
+          for (const value of forbidden) if (html.includes(value)) throw new Error(`Legacy language control remains: ${value}`);
+          if (global.includes('translate.google.com') || global.includes('googleTranslateElementInit')) throw new Error('Legacy translation runtime remains in global.js');
+          for (const field of ['business_name','recruiter_contact_opt_in','account_type','date_of_birth']) if (!marketplace.includes(field)) throw new Error(`Signup metadata missing: ${field}`);
           if (!wrangler.includes('cloudflare/worker/src/runtime.js')) throw new Error('Safety runtime is not the Cloudflare entrypoint');
-          if (!wrangler.includes('"17 5 * * *"')) throw new Error('KREVUNO daily open-job cron is not enabled');
-          for (const country of ['US','DE','GB','IN','NL','FR','BR','CA','PL','CH']) {
-            if (!countryIngest.includes(`code: "${country}"`)) throw new Error(`Priority country missing: ${country}`);
-          }
-          if (countryIngest.includes('code: "CN"')) throw new Error('China must remain excluded from this priority feed');
-          console.log('KREVUNO auth/runtime/daily-ingestion contract checks passed');
+          for (const cron of ['0 * * * *','20 * * * *','40 * * * *']) if (!wrangler.includes(`"${cron}"`)) throw new Error(`Global sweep cron missing: ${cron}`);
+          if (!countryIngest.includes('ROLLOUT_BATCH_SIZE = 10')) throw new Error('10-country rollout batch missing');
+          if (!countryIngest.includes('4 * 60 * 60 * 1000')) throw new Error('4-hour rollout interval missing');
+          if (!countryIngest.includes('SHARD_COUNT = 3')) throw new Error('Three-shard hourly sweep missing');
+          if (countryIngest.includes('["CN"')) throw new Error('China must remain excluded');
+          const countryPairs = [...countryIngest.matchAll(/\["([A-Z]{2})","[^"]+"\]/g)].map(m => m[1]);
+          const unique = new Set(countryPairs);
+          if (unique.size !== 150) throw new Error(`Expected 150 unique countries, found ${unique.size}`);
+          for (const country of ['US','DE','GB','IN','NL','FR','BR','CA','PL','CH']) if (!unique.has(country)) throw new Error(`Priority country missing: ${country}`);
+          console.log('KREVUNO 150-country global ingestion contract checks passed');
           NODE
