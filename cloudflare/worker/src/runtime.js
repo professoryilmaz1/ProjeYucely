@@ -1,5 +1,5 @@
 import base from "./index.js";
-import { runPriorityCountryIngestion } from "./country-ingest.js";
+import { runGlobalCountryIngestion } from "./country-ingest.js";
 
 function securityHeaders(response) {
   const out = new Response(response.body, response);
@@ -19,35 +19,30 @@ export default {
         message: error instanceof Error ? error.message : String(error),
         path: new URL(request.url).pathname,
       });
-      return securityHeaders(
-        new Response(
-          JSON.stringify({ ok: false, error: "INTERNAL_ERROR" }),
-          {
-            status: 500,
-            headers: {
-              "content-type": "application/json; charset=utf-8",
-              "cache-control": "no-store",
-            },
-          }
-        )
-      );
+      return securityHeaders(new Response(JSON.stringify({ ok: false, error: "INTERNAL_ERROR" }), {
+        status: 500,
+        headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+      }));
     }
   },
 
   async scheduled(controller, env, ctx) {
-    if (typeof base.scheduled === "function") {
+    const minute = Number(String(controller.cron || "0 * * * *").trim().split(/\s+/)[0]);
+
+    // Existing KREVUNO external providers run once per hour only.
+    if (minute === 0 && typeof base.scheduled === "function") {
       await base.scheduled(controller, env, ctx);
     }
 
+    // Global country sweep is sharded at minute 0/20/40. Across the three shards,
+    // every currently active country is checked once per hour.
     ctx.waitUntil(
-      runPriorityCountryIngestion(env)
-        .then((result) => console.log("krevuno.country_ingest.completed", JSON.stringify(result)))
-        .catch((error) =>
-          console.error("krevuno.country_ingest.failed", {
-            message: error instanceof Error ? error.message : String(error),
-            cron: controller.cron,
-          })
-        )
+      runGlobalCountryIngestion(env, { cron: controller.cron })
+        .then((result) => console.log("krevuno.global_country_sweep.completed", JSON.stringify(result)))
+        .catch((error) => console.error("krevuno.global_country_sweep.failed", {
+          message: error instanceof Error ? error.message : String(error),
+          cron: controller.cron,
+        }))
     );
   },
 };
