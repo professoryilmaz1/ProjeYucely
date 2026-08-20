@@ -4,11 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#111827">
-  <title>KREVUNO — Nearby short-term work, help and fast hiring</title>
-  <meta name="description" content="KREVUNO is a global marketplace for nearby short-term, hourly, daily and part-time work, local services and fast staffing. Personal and business signup is free.">
-  <meta property="og:title" content="KREVUNO — Work nearby. Hire fast. Get help.">
-  <meta property="og:description" content="Free signup for people and businesses. Find nearby short-term work and local services, or post a need and reach available people faster.">
-  <meta name="twitter:card" content="summary">
+  <title>KREVUNO — Nearby work, fast hiring and local help</title>
+  <meta name="description" content="KREVUNO connects people and businesses with nearby short-term, hourly, daily, part-time and remote work, services and fast staffing.">
   <link rel="preconnect" href="https://unpkg.com" crossorigin>
   <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin>
   <link rel="preconnect" href="https://hfqjiehsdqwqeivcqfzg.supabase.co" crossorigin>
@@ -16,194 +13,101 @@
   <link rel="stylesheet" href="/global.css">
   <link rel="preload" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></noscript>
+  <style>
+    .market-preview{display:grid;gap:14px}.market-preview-head{display:flex;gap:18px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}.market-cta{display:inline-flex;align-items:center;justify-content:center;padding:11px 16px;border-radius:10px;text-decoration:none;font-weight:800;border:1px solid currentColor}.home-business{margin-top:18px}.auth-dialog{width:min(860px,calc(100vw - 28px));max-height:90vh;overflow:auto;border:0;border-radius:18px;padding:0;box-shadow:0 24px 70px rgba(0,0,0,.28)}.auth-dialog::backdrop{background:rgba(15,23,42,.55)}.auth-shell{padding:22px}.auth-close{float:right;border:0;background:transparent;font-size:26px;line-height:1;cursor:pointer}.auth-shell #accountCard{margin:0}.compact-note{font-size:.92rem;opacity:.82}.home-market-list .item:nth-child(n+4){display:none}@media(max-width:760px){.market-preview-head{display:block}.market-cta{margin-top:12px;width:100%}}
+  </style>
 </head>
-<body>
-  <header class="nav">
-    <div class="brand">
-      <span class="mark">KR</span>
-      <div><strong>KREVUNO</strong><small>by IMPOCOR GROUP LLC</small></div>
-    </div>
-    <div class="navright">
-      <span id="backendState" class="live"><i></i> Checking backend</span>
-      <button id="navSignIn" class="ghost" type="button">SIGN IN</button>
-      <button id="navSignUp" class="ghost" type="button">SIGN UP</button>
-      <button id="navProfile" class="ghost" type="button" hidden>PROFILE</button>
-      <button id="logoutBtn" class="ghost" type="button" hidden>LOG OUT</button>
-    </div>
-  </header>
+<body data-page="home">
+<header class="nav">
+  <div class="brand"><span class="mark">KR</span><div><strong>KREVUNO</strong><small>by IMPOCOR GROUP LLC</small></div></div>
+  <div class="navright">
+    <span id="backendState" class="live"><i></i> Checking backend</span>
+    <button id="navSignIn" class="ghost" type="button">SIGN IN</button>
+    <button id="navSignUp" class="ghost" type="button">SIGN UP</button>
+    <button id="navProfile" class="ghost" type="button" hidden>PROFILE</button>
+    <button id="logoutBtn" class="ghost" type="button" hidden>LOG OUT</button>
+  </div>
+</header>
 
-  <main>
-    <section class="hero">
-      <div class="eyebrow">NEED • EARN • JOBS • HIRE • HELP</div>
-      <h1 id="heroTitle">Work nearby. Hire fast. Get help when you need it.</h1>
-      <p id="heroText">KREVUNO connects people and businesses with nearby short-term, hourly, daily and part-time work and services. Personal and business signup is free.</p>
-      <form id="oneForm" class="one">
-        <textarea id="oneText" placeholder="Example: I need a 4-hour job near me today" required></textarea>
-        <button type="submit">MAKE A PLAN</button>
-      </form>
-      <div class="chips">
-        <button data-p="I need someone to help me today">I NEED HELP</button>
-        <button data-p="I want short-term work near me">I WANT TO EARN</button>
-        <button data-p="I am looking for a part-time job near me">FIND A JOB</button>
-        <button data-p="I need someone for a short shift today">HIRE</button>
+<main>
+  <section class="hero">
+    <div class="eyebrow">NEED • EARN • JOBS • HIRE • HELP</div>
+    <h1 id="heroTitle">Work nearby. Hire fast. Get help when you need it.</h1>
+    <p id="heroText">Tell KREVUNO what you want in normal language. Search by profession, country, city, state, ZIP code, distance or remote work.</p>
+    <form id="oneForm" class="one"><textarea id="oneText" placeholder="Examples: engineering jobs in NJ • work near 07005 • nurse jobs in Canada • I need a 4-hour job near me" required></textarea><button type="submit">SEARCH / PLAN</button></form>
+    <div class="chips"><button data-p="I need someone to help me today">I NEED HELP</button><button data-p="I want short-term work near me">I WANT TO EARN</button><button data-p="engineering jobs in NJ">FIND A JOB</button><button data-p="I need someone for a short shift today">HIRE</button></div>
+  </section>
+
+  <section class="card map-card" aria-label="Global KREVUNO marketplace map">
+    <div class="map-head"><div><div class="eyebrow">GLOBAL ACTIVITY MAP</div><h2>Explore KREVUNO around the world</h2><p>Start globally, then zoom to country, city and neighborhood. Exact personal locations are never public.</p></div><div class="map-controls"><button id="locateBtn" type="button">Use my location</button><button id="worldBtn" type="button">World view</button><label class="radius-control">Search radius <input id="radiusSlider" type="range" min="5" max="500" step="5" value="25"><span id="radiusValue" class="radius-value">25 mi</span></label></div></div>
+    <div id="mapStatus" class="map-status">Click anywhere on the map to set your search center. Location permission is optional.</div>
+    <div id="densityStatus" class="map-status">Map ready. Loading public KREVUNO opportunity activity…</div>
+    <div class="map-wrap"><div id="worldMap" class="world-map"><div class="map-loading" aria-hidden="true">Loading world map…</div></div><div class="map-legend"><div><span class="dot center"></span> Search center + radius</div><div><span class="dot activity"></span> Public KREVUNO activity</div></div></div>
+  </section>
+
+  <section class="card market-preview">
+    <div class="market-preview-head"><div><div class="eyebrow">MARKETPLACE</div><h2>Live opportunities</h2><p class="small">The home page shows only three examples. Open Marketplace for the full searchable list.</p></div><a class="market-cta" href="/marketplace">OPEN MARKETPLACE →</a></div>
+    <div id="earnList" class="list home-market-list" data-preview-limit="3"><div class="empty small">Loading live opportunities…</div></div>
+  </section>
+
+  <section class="grid metrics">
+    <article><span>Open needs</span><strong id="mNeeds">0</strong></article>
+    <article><span>Loaded opportunities</span><strong id="mEarn">0</strong></article>
+    <article><span>Saved plans</span><strong id="mPlans">0</strong></article>
+    <article><span>Platform fee when you earn</span><strong>3%</strong></article>
+  </section>
+
+  <section class="card home-business">
+    <div class="title"><h2>For businesses</h2><span class="badge green">FREE SIGNUP</span></div>
+    <div class="security-list"><div><strong>Post short-term needs</strong><span>Hourly, daily, part-time, temporary and service work.</span></div><div><strong>Reach available people faster</strong><span>Publish clear work, pay and timing so nearby eligible people can evaluate it.</span></div><div><strong>Control cost</strong><span>Set scope and budget before work starts.</span></div><div><strong>Optional Business Starter</strong><span>$39/month when advanced tools are activated; basic business signup remains free.</span></div></div>
+  </section>
+
+  <section class="card"><div class="title"><h2>AI Action Result</h2><span id="intent" class="badge">WAITING</span></div><div id="result" class="empty">For work searches, KREVUNO opens the searchable Marketplace. For NEED / HIRE / planning requests, it builds the next action here.</div></section>
+
+  <section class="grid three">
+    <article class="card"><h2>NEED / HIRE</h2><form id="needForm" class="stack"><select name="kind"><option value="HELP">HELP — local/personal help</option><option value="GIG">GIG — paid short task/project</option><option value="JOB">JOB — employment / shift opening</option></select><input name="title" placeholder="What do you need and when?" required><input name="budget" type="number" min="0" placeholder="Budget / pay"><button>Add need</button></form><div id="needList" class="list"></div></article>
+    <article class="card"><h2>EARN availability</h2><form id="availForm" class="stack"><input name="skill" placeholder="What can you do?" required><input name="hours" placeholder="Available hours / days"><input name="minimum" type="number" min="0" placeholder="Minimum $"><button>Save availability</button></form><div id="availList" class="list"></div></article>
+    <article class="card"><h2>Money Mission</h2><form id="moneyForm" class="stack"><input name="target" type="number" min="1" placeholder="Target amount" required><button>Build mission</button></form><div id="moneyResult" class="empty small">Set a target to build a realistic plan from live opportunities that are actually available.</div></article>
+  </section>
+
+  <section class="grid two"><article class="card"><div class="title"><h2>Share & Earn</h2><span class="badge">REFERRAL</span></div><p>Invite people or businesses. Rewards unlock only after verified economic activity.</p><button id="referralBtn" type="button">Create my invite link</button><div id="referralResult" class="empty small">Sign in to create a unique referral link.</div></article><article class="card"><h2>How money works</h2><div class="security-list"><div><strong>Personal membership</strong><span>Free.</span></div><div><strong>Business signup</strong><span>Free.</span></div><div><strong>Earner success fee</strong><span>3% of completed marketplace earnings.</span></div><div><strong>Business Starter</strong><span>Optional $39/month after upgrade is activated.</span></div></div></article></section>
+
+  <section class="card life"><div class="title"><h2>Life Center</h2><span class="badge">BUDGET • DAILY 3 • WHAT IF</span></div><div class="grid three"><form id="budgetForm" class="stack"><input name="income" type="number" min="0" placeholder="Monthly income"><input name="housing" type="number" min="0" placeholder="Housing"><input name="food" type="number" min="0" placeholder="Food"><input name="transport" type="number" min="0" placeholder="Transport"><input name="other" type="number" min="0" placeholder="Other"><button>Analyze</button></form><div><h3>Budget</h3><div id="budgetResult" class="empty small">Enter your monthly numbers.</div></div><div><h3>Daily 3</h3><div id="daily3" class="list"><div class="empty small">Your three priorities will appear here.</div></div></div></div></section>
+
+  <section class="notice"><strong>Privacy & safety:</strong> map location is optional. Exact personal locations are not public. JOB, GIG and HELP remain separate workflows. Payments and payouts remain gated behind identity/KYC and transaction controls.</section>
+</main>
+
+<dialog id="authDialog" class="auth-dialog">
+  <div class="auth-shell">
+    <button id="authClose" class="auth-close" type="button" aria-label="Close">×</button>
+    <article id="accountCard" class="card">
+      <div class="title"><h2>Account</h2><span id="authBadge" class="badge">GUEST</span></div>
+      <div id="authMessage" class="empty small">18+ launch. Personal membership is free. Business signup is free.</div>
+      <div id="profilePanel" hidden></div>
+      <div id="authForms" class="grid two">
+        <form id="loginForm" class="stack"><h3>Sign in</h3><input name="email" type="email" placeholder="Email" required><input name="password" type="password" minlength="10" placeholder="Password" required><button>Sign in</button></form>
+        <form id="signupForm" class="stack"><h3>Create free account</h3><select id="accountType" name="account_type"><option value="PERSONAL">Personal — FREE</option><option value="BUSINESS_REP">Business / Organization — FREE signup</option></select><input name="display_name" placeholder="Your name" required><input name="date_of_birth" type="date" required><input name="email" type="email" placeholder="Email" required><input name="password" type="password" minlength="10" placeholder="Create password" required><input id="businessName" name="business_name" placeholder="Business / organization name" hidden><label class="small"><input name="recruiter_contact_opt_in" type="checkbox"> Allow verified businesses to contact me directly about relevant opportunities</label><button>Create free account</button><div class="empty small">By creating an account you confirm you are 18 or older.</div></form>
       </div>
-    </section>
+      <span id="identityStatus" hidden></span><span id="dataStatus" hidden></span><span id="marketBadge" hidden></span>
+    </article>
+  </div>
+</dialog>
 
-    <section class="card map-card" aria-label="Global KREVUNO marketplace map">
-      <div class="map-head">
-        <div>
-          <div class="eyebrow">GLOBAL ACTIVITY MAP</div>
-          <h2>Explore KREVUNO around the world</h2>
-          <p>Start globally, then zoom to country, city and neighborhood to look for nearby work and service activity.</p>
-        </div>
-        <div class="map-controls">
-          <button id="locateBtn" type="button">Use my location</button>
-          <button id="worldBtn" type="button">World view</button>
-          <label class="radius-control">Search radius <input id="radiusSlider" type="range" min="5" max="500" step="5" value="25"><span id="radiusValue" class="radius-value">25 mi</span></label>
-        </div>
-      </div>
-      <div id="mapStatus" class="map-status">Click anywhere on the map to set your search center. Location permission is optional.</div>
-      <div id="densityStatus" class="map-status">Map ready. Loading public KREVUNO opportunity activity…</div>
-      <div class="map-wrap">
-        <div id="worldMap" class="world-map"><div class="map-loading" aria-hidden="true">Loading world map…</div></div>
-        <div class="map-legend"><div><span class="dot center"></span> Search center + radius</div><div><span class="dot activity"></span> Public KREVUNO activity</div></div>
-      </div>
-    </section>
-
-    <section class="grid two">
-      <article id="accountCard" class="card">
-        <div class="title"><h2>Account</h2><span id="authBadge" class="badge">GUEST</span></div>
-        <div id="authMessage" class="empty small">18+ launch. Personal membership is free. Business signup is free; optional Business Starter tools are $39/month when activated.</div>
-        <div id="profilePanel" hidden></div>
-        <div id="authForms" class="grid two">
-          <form id="loginForm" class="stack">
-            <h3>Sign in</h3>
-            <input name="email" type="email" placeholder="Email" required>
-            <input name="password" type="password" minlength="10" placeholder="Password" required>
-            <button>Sign in</button>
-          </form>
-          <form id="signupForm" class="stack">
-            <h3>Create free account</h3>
-            <select id="accountType" name="account_type">
-              <option value="PERSONAL">Personal — FREE</option>
-              <option value="BUSINESS_REP">Business / Organization — FREE signup</option>
-            </select>
-            <input name="display_name" placeholder="Your name" required>
-            <input name="date_of_birth" type="date" required>
-            <input name="email" type="email" placeholder="Email" required>
-            <input name="password" type="password" minlength="10" placeholder="Create password" required>
-            <input id="businessName" name="business_name" placeholder="Business / organization name" hidden>
-            <label class="small"><input name="recruiter_contact_opt_in" type="checkbox"> Allow verified businesses to contact me directly about relevant opportunities</label>
-            <button>Create free account</button>
-            <div class="empty small">By creating an account you confirm you are 18 or older.</div>
-          </form>
-        </div>
-        <span id="identityStatus" hidden></span>
-        <span id="dataStatus" hidden></span>
-        <span id="marketBadge" hidden></span>
-      </article>
-
-      <article class="card">
-        <div class="title"><h2>Business</h2><span class="badge green">FREE SIGNUP</span></div>
-        <div class="security-list">
-          <div><strong>Post short-term needs</strong><span>Use KREVUNO for hourly, daily, part-time, temporary and service needs instead of starting a long hiring process for every small task.</span></div>
-          <div><strong>Reach available people faster</strong><span>Publish clear work, pay and timing so nearby eligible people can evaluate the opportunity.</span></div>
-          <div><strong>Control cost</strong><span>Set scope and budget before work starts and compare options instead of overpaying for short-duration needs.</span></div>
-          <div><strong>Optional Business Starter</strong><span>$39/month for advanced hiring tools when billing is activated; basic business signup remains free.</span></div>
-        </div>
-      </article>
-    </section>
-
-    <section class="grid metrics">
-      <article><span>Open needs</span><strong id="mNeeds">0</strong></article>
-      <article><span>Earn opportunities</span><strong id="mEarn">0</strong></article>
-      <article><span>Saved plans</span><strong id="mPlans">0</strong></article>
-      <article><span>Platform fee when you earn</span><strong>3%</strong></article>
-    </section>
-
-    <section class="grid two">
-      <article class="card">
-        <div class="title"><h2>AI Action Result</h2><span id="intent" class="badge">WAITING</span></div>
-        <div id="result" class="empty">Tell KREVUNO what you need. It will classify the request and build practical next actions.</div>
-      </article>
-      <article class="card">
-        <div class="title"><h2>EARN</h2><span class="badge green">MARKETPLACE</span></div>
-        <p class="small">When real opportunities are available, use your location and radius to prioritize nearby short-term, hourly, daily, part-time or remote work.</p>
-        <div id="earnList" class="list"></div>
-      </article>
-    </section>
-
-    <section class="grid three">
-      <article class="card">
-        <h2>NEED / HIRE</h2>
-        <form id="needForm" class="stack">
-          <select name="kind"><option value="HELP">HELP — local/personal help</option><option value="GIG">GIG — paid short task/project</option><option value="JOB">JOB — employment / shift opening</option></select>
-          <input name="title" placeholder="What do you need and when?" required>
-          <input name="budget" type="number" min="0" placeholder="Budget / pay">
-          <button>Add need</button>
-        </form>
-        <div id="needList" class="list"></div>
-      </article>
-
-      <article class="card">
-        <h2>EARN availability</h2>
-        <form id="availForm" class="stack">
-          <input name="skill" placeholder="What can you do?" required>
-          <input name="hours" placeholder="Available hours / days">
-          <input name="minimum" type="number" min="0" placeholder="Minimum $">
-          <button>Save availability</button>
-        </form>
-        <div id="availList" class="list"></div>
-      </article>
-
-      <article class="card">
-        <h2>Money Mission</h2>
-        <form id="moneyForm" class="stack"><input name="target" type="number" min="1" placeholder="Target amount" required><button>Build mission</button></form>
-        <div id="moneyResult" class="empty small">Set a target to build a realistic plan from live KREVUNO and external opportunities that are actually available.</div>
-      </article>
-    </section>
-
-    <section class="grid two">
-      <article class="card">
-        <div class="title"><h2>Share & Earn</h2><span class="badge">REFERRAL</span></div>
-        <p>Invite people or businesses. Rewards unlock only after verified economic activity—not just a signup.</p>
-        <button id="referralBtn" type="button">Create my invite link</button>
-        <div id="referralResult" class="empty small">Sign in to create a unique referral link.</div>
-      </article>
-      <article class="card">
-        <h2>How money works</h2>
-        <div class="security-list">
-          <div><strong>Personal membership</strong><span>Free.</span></div>
-          <div><strong>Business signup</strong><span>Free.</span></div>
-          <div><strong>Earner success fee</strong><span>3% of completed marketplace earnings.</span></div>
-          <div><strong>Business Starter</strong><span>Optional $39/month after upgrade is activated.</span></div>
-        </div>
-      </article>
-    </section>
-
-    <section class="card life">
-      <div class="title"><h2>Life Center</h2><span class="badge">BUDGET • DAILY 3 • WHAT IF</span></div>
-      <div class="grid three">
-        <form id="budgetForm" class="stack">
-          <input name="income" type="number" min="0" placeholder="Monthly income">
-          <input name="housing" type="number" min="0" placeholder="Housing">
-          <input name="food" type="number" min="0" placeholder="Food">
-          <input name="transport" type="number" min="0" placeholder="Transport">
-          <input name="other" type="number" min="0" placeholder="Other">
-          <button>Analyze</button>
-        </form>
-        <div><h3>Budget</h3><div id="budgetResult" class="empty small">Enter your monthly numbers.</div></div>
-        <div><h3>Daily 3</h3><div id="daily3" class="list"><div class="empty small">Your three priorities will appear here.</div></div></div>
-      </div>
-    </section>
-
-    <section class="notice"><strong>Privacy & safety:</strong> map location is optional. Exact personal locations are not public. JOB, GIG and HELP are separate workflows. Availability depends on real marketplace activity. Payments and payouts remain gated behind appropriate identity/KYC and transaction controls.</section>
-  </main>
-
-  <footer>© 2026 IMPOCOR GROUP LLC • KREVUNO</footer>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script type="module" src="/marketplace.js"></script>
-  <script type="module" src="/app.js"></script>
-  <script type="module" src="/global.js"></script>
+<footer>© 2026 IMPOCOR GROUP LLC • KREVUNO</footer>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module" src="/marketplace.js"></script>
+<script type="module" src="/app.js"></script>
+<script type="module" src="/global.js"></script>
+<script>
+(function(){
+  const jobWords=/\b(job|jobs|work|earn|career|position|engineering|engineer|nurse|driver|software|developer|iş|is ariyorum|mühendis|muhendis|yakınımda|yakinimda|\d{5}|\bNJ\b|\bNY\b|\bPA\b)\b/i;
+  const openAuth=(target)=>{const d=document.getElementById('authDialog');if(!d)return;if(typeof d.showModal==='function'&&!d.open)d.showModal();else d.setAttribute('open','');setTimeout(()=>document.querySelector(target)?.focus(),80)};
+  document.addEventListener('DOMContentLoaded',()=>{
+    [['navSignIn','#loginForm input[name=email]'],['navSignUp','#signupForm input[name=display_name]'],['navProfile','#profilePanel']].forEach(([id,target])=>document.getElementById(id)?.addEventListener('click',(e)=>{e.preventDefault();e.stopImmediatePropagation();openAuth(target)},true));
+    document.getElementById('authClose')?.addEventListener('click',()=>document.getElementById('authDialog')?.close());
+    document.getElementById('oneForm')?.addEventListener('submit',(e)=>{const text=document.getElementById('oneText')?.value?.trim()||'';if(jobWords.test(text)){e.preventDefault();e.stopImmediatePropagation();location.href='/marketplace?q='+encodeURIComponent(text)}},true);
+  });
+})();
+</script>
 </body>
 </html>
