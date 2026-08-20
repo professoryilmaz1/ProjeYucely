@@ -1,58 +1,17 @@
 const geoState = window.__KREVUNO_GEO_STATE__ || { lat: 20, lng: 0, radius: 25, located: false };
 window.__KREVUNO_GEO_STATE__ = geoState;
-const countryLang = {US:"en",GB:"en",IE:"en",CA:"en",AU:"en",NZ:"en",TR:"tr",DE:"de",AT:"de",CH:"de",FR:"fr",BE:"fr",ES:"es",MX:"es",AR:"es",CO:"es",CL:"es",PE:"es",BR:"pt",PT:"pt",IT:"it",NL:"nl",PL:"pl",CZ:"cs",SK:"sk",HU:"hu",RO:"ro",BG:"bg",GR:"el",UA:"uk",RU:"ru",SE:"sv",NO:"no",DK:"da",FI:"fi",EE:"et",LV:"lv",LT:"lt",JP:"ja",KR:"ko",CN:"zh-CN",TW:"zh-TW",HK:"zh-TW",IN:"hi",PK:"ur",BD:"bn",ID:"id",MY:"ms",PH:"tl",TH:"th",VN:"vi",SA:"ar",AE:"ar",QA:"ar",KW:"ar",EG:"ar",MA:"ar",DZ:"ar",IL:"iw",IR:"fa",ZA:"en",NG:"en",KE:"en",TZ:"sw",ET:"am"};
-let autoLanguage = preferredLanguage();
 let activityLayer = null;
-
-function preferredLanguage() {
-  return (navigator.languages?.[0] || navigator.language || "en").split("-")[0] || "en";
-}
 
 function idle(fn, timeout = 1500) {
   if ("requestIdleCallback" in window) requestIdleCallback(fn, { timeout });
   else setTimeout(fn, 250);
 }
 
-window.googleTranslateElementInit = function () {
-  new google.translate.TranslateElement({ pageLanguage: "en", autoDisplay: false }, "google_translate_element");
-  applyLanguage(autoLanguage);
-};
-
-function applyLanguage(lang) {
-  if (!lang || lang === "en") return;
-  let tries = 0;
-  const timer = setInterval(() => {
-    const combo = document.querySelector(".goog-te-combo");
-    if (combo && [...combo.options].some((option) => option.value === lang)) {
-      combo.value = lang;
-      combo.dispatchEvent(new Event("change"));
-      clearInterval(timer);
-    } else if (++tries > 20) clearInterval(timer);
-  }, 200);
-}
-
-function loadTranslator() {
-  const script = document.createElement("script");
-  script.src = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
-  script.async = true;
-  script.defer = true;
-  script.onerror = () => {
-    const status = document.getElementById("localeStatus");
-    if (status) status.textContent = "Automatic translation unavailable; browser language remains active.";
-  };
-  document.head.appendChild(script);
-}
-
-async function detectCountryLanguage(lat, lng) {
+async function updateLocationLabel(lat, lng) {
   try {
     const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lng)}&localityLanguage=en`);
     if (!response.ok) return;
     const data = await response.json();
-    const code = String(data.countryCode || "").toUpperCase();
-    if (countryLang[code]) {
-      autoLanguage = countryLang[code];
-      applyLanguage(autoLanguage);
-    }
     const label = [data.locality, data.principalSubdivision, data.countryName].filter(Boolean).join(", ");
     const status = document.getElementById("mapStatus");
     if (status) status.textContent = label ? `Search center: ${label}` : "Search center updated.";
@@ -92,6 +51,7 @@ function initMap() {
     markerZoomAnimation: false,
     zoomAnimation: true,
   }).setView([geoState.lat, geoState.lng], geoState.located ? 10 : 1);
+
   const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     minZoom: 1,
@@ -102,18 +62,21 @@ function initMap() {
     updateWhenZooming: false,
     crossOrigin: true,
   }).addTo(map);
+
   const centerMarker = L.circleMarker([geoState.lat, geoState.lng], {
     radius: 7,
     weight: 3,
     fillOpacity: 1,
     renderer,
   }).addTo(map);
+
   const radiusCircle = L.circle([geoState.lat, geoState.lng], {
     radius: geoState.radius * 1609.344,
     weight: 2,
     fillOpacity: 0.07,
     renderer,
   }).addTo(map);
+
   const value = document.getElementById("radiusValue");
   const slider = document.getElementById("radiusSlider");
   const status = document.getElementById("mapStatus");
@@ -144,10 +107,12 @@ function initMap() {
   }
 
   slider?.addEventListener("input", (event) => setRadius(event.target.value));
+
   map.on("click", (event) => {
     saveCenter(event.latlng.lat, event.latlng.lng, true);
-    detectCountryLanguage(event.latlng.lat, event.latlng.lng);
+    updateLocationLabel(event.latlng.lat, event.latlng.lng);
   });
+
   document.getElementById("locateBtn")?.addEventListener("click", () => {
     if (!navigator.geolocation) {
       if (status) status.textContent = "Location is not supported in this browser.";
@@ -159,7 +124,7 @@ function initMap() {
         const { latitude, longitude } = position.coords;
         saveCenter(latitude, longitude, true);
         map.setView([latitude, longitude], 12, { animate: false });
-        detectCountryLanguage(latitude, longitude);
+        updateLocationLabel(latitude, longitude);
       },
       () => {
         if (status) status.textContent = "Location permission was not granted. Click the map to choose a search center.";
@@ -167,13 +132,14 @@ function initMap() {
       { enableHighAccuracy: false, timeout: 6000, maximumAge: 600000 }
     );
   });
+
   document.getElementById("worldBtn")?.addEventListener("click", () => map.setView([20, 0], 1, { animate: false }));
 
   const scheduleActivity = () => idle(() => loadActivity(map, renderer), 1200);
   tiles.once("load", scheduleActivity);
   setTimeout(scheduleActivity, 1200);
   window.addEventListener("krevuno:geo-change", scheduleActivity);
-  if (geoState.located) idle(() => detectCountryLanguage(geoState.lat, geoState.lng), 1200);
+  if (geoState.located) idle(() => updateLocationLabel(geoState.lat, geoState.lng), 1200);
   requestAnimationFrame(() => map.invalidateSize({ animate: false }));
 }
 
@@ -188,6 +154,7 @@ async function loadActivity(map, renderer) {
     if (activityLayer) activityLayer.remove();
     activityLayer = L.layerGroup().addTo(map);
     let count = 0;
+
     for (const opportunity of rows) {
       const lat = Number(opportunity.latitude);
       const lng = Number(opportunity.longitude);
@@ -198,6 +165,7 @@ async function loadActivity(map, renderer) {
         .addTo(activityLayer);
       count++;
     }
+
     if (status) {
       status.textContent = count
         ? `${count} public KREVUNO opportunity locations are visible. Zoom in to explore nearby activity.`
@@ -211,4 +179,3 @@ async function loadActivity(map, renderer) {
 installGeoFetchBridge();
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initMap, { once: true });
 else initMap();
-idle(loadTranslator, 1800);
