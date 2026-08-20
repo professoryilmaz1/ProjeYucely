@@ -1,5 +1,5 @@
 import base from "./index.js";
-import { runGlobalCountryIngestion } from "./country-ingest.js";
+import { runWorldCountrySweep } from "./world-country-sweep.js";
 
 function securityHeaders(response) {
   const out = new Response(response.body, response);
@@ -29,17 +29,17 @@ export default {
   async scheduled(controller, env, ctx) {
     const minute = Number(String(controller.cron || "0 * * * *").trim().split(/\s+/)[0]);
 
-    // Existing KREVUNO external providers run once per hour only.
+    // Existing KREVUNO public providers run once per hour.
     if (minute === 0 && typeof base.scheduled === "function") {
       await base.scheduled(controller, env, ctx);
     }
 
-    // Global country sweep is sharded at minute 0/20/40. Across the three shards,
-    // every currently active country is checked once per hour.
+    // Independent world scanner: all 150 countries are scanned every hour across
+    // minute 0/20/40 shards. Public visibility still rolls out +10 countries/4h.
     ctx.waitUntil(
-      runGlobalCountryIngestion(env, { cron: controller.cron })
-        .then((result) => console.log("krevuno.global_country_sweep.completed", JSON.stringify(result)))
-        .catch((error) => console.error("krevuno.global_country_sweep.failed", {
+      runWorldCountrySweep(env, { cron: controller.cron })
+        .then((result) => console.log("krevuno.world_country_sweep.completed", JSON.stringify(result)))
+        .catch((error) => console.error("krevuno.world_country_sweep.failed", {
           message: error instanceof Error ? error.message : String(error),
           cron: controller.cron,
         }))
