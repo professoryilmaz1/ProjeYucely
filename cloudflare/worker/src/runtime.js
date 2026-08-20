@@ -1,4 +1,5 @@
 import base from "./index.js";
+import { runPriorityCountryIngestion } from "./country-ingest.js";
 
 function securityHeaders(response) {
   const out = new Response(response.body, response);
@@ -35,7 +36,18 @@ export default {
 
   async scheduled(controller, env, ctx) {
     if (typeof base.scheduled === "function") {
-      return base.scheduled(controller, env, ctx);
+      await base.scheduled(controller, env, ctx);
     }
+
+    ctx.waitUntil(
+      runPriorityCountryIngestion(env)
+        .then((result) => console.log("krevuno.country_ingest.completed", JSON.stringify(result)))
+        .catch((error) =>
+          console.error("krevuno.country_ingest.failed", {
+            message: error instanceof Error ? error.message : String(error),
+            cron: controller.cron,
+          })
+        )
+    );
   },
 };
