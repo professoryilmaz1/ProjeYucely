@@ -551,6 +551,7 @@ if (moneyForm) {
         amount: Number(opportunity.amount || 0),
       }))
       .filter((opportunity) => opportunity.amount > 0);
+
     if (!source.length) {
       setHtml(
         "moneyResult",
@@ -558,6 +559,7 @@ if (moneyForm) {
       );
       return;
     }
+
     let total = 0;
     const chosen = [];
     for (const opportunity of [...source].sort((a, b) => b.amount - a.amount)) {
@@ -565,12 +567,15 @@ if (moneyForm) {
       chosen.push(opportunity);
       total += Number(opportunity.amount || 0);
     }
+
     setHtml(
       "moneyResult",
       `<strong>Target: ${money(target)}</strong><br>Selected live opportunity value: ${money(total)}<div class="list">${chosen.map((opportunity) => `<div class="item"><strong>${esc(opportunity.title)}</strong><span>${money(opportunity.amount)}</span></div>`).join("")}</div>`
     );
+
     state.plans = (state.plans || 0) + 1;
     persist();
+
     if (remoteReady && session?.user?.id) {
       try {
         await rest("vovyyvov_money_missions", {
@@ -602,10 +607,12 @@ if (budgetForm) {
     );
     const balance = income - expenses;
     const rate = income ? Math.max(-1, balance / income) : 0;
+
     setHtml(
       "budgetResult",
       `Income <strong>${money(income)}</strong><br>Expenses <strong>${money(expenses)}</strong><br>Balance <strong>${money(balance)}</strong><br>Savings rate <strong>${(rate * 100).toFixed(1)}%</strong>`
     );
+
     const daily = balance < 0
       ? [
           `Close the deficit: identify ${money(Math.abs(balance))} in cuts or additional earned income.`,
@@ -617,6 +624,7 @@ if (budgetForm) {
           "Review one recurring expense for a lower-cost alternative.",
           "Use part of the remaining surplus for the highest-priority goal.",
         ];
+
     setHtml(
       "daily3",
       daily.map((item, index) => `<div class="item"><strong>${index + 1}. ${esc(item)}</strong></div>`).join("")
