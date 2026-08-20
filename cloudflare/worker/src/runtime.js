@@ -1,5 +1,6 @@
 import base from "./index.js";
 import { runWorldCountrySweep } from "./world-country-sweep.js";
+import { handleEnhancedOpportunityRequest } from "./opportunity-routing-v2.js";
 
 function securityHeaders(response) {
   const out = new Response(response.body, response);
@@ -13,6 +14,8 @@ function securityHeaders(response) {
 export default {
   async fetch(request, env, ctx) {
     try {
+      const enhanced = await handleEnhancedOpportunityRequest(request, env);
+      if (enhanced) return securityHeaders(enhanced);
       return securityHeaders(await base.fetch(request, env, ctx));
     } catch (error) {
       console.error("krevuno.runtime.unhandled", {
@@ -29,13 +32,10 @@ export default {
   async scheduled(controller, env, ctx) {
     const minute = Number(String(controller.cron || "0 * * * *").trim().split(/\s+/)[0]);
 
-    // Existing KREVUNO public providers run once per hour.
     if (minute === 0 && typeof base.scheduled === "function") {
       await base.scheduled(controller, env, ctx);
     }
 
-    // Independent world scanner: all 150 countries are scanned every hour across
-    // minute 0/20/40 shards. Public visibility still rolls out +10 countries/4h.
     ctx.waitUntil(
       runWorldCountrySweep(env, { cron: controller.cron })
         .then((result) => console.log("krevuno.world_country_sweep.completed", JSON.stringify(result)))

@@ -9,7 +9,8 @@
     "test:worker": "node --test cloudflare/worker/worker.test.js",
     "test:ingest": "node --test ingest.test.js",
     "test:country-ingest": "node --test country-ingest.test.js",
-    "test": "node --test cloudflare/worker/worker.test.js && node --test ingest.test.js && node --test country-ingest.test.js"
+    "test:opportunity-routing": "node --test opportunity-routing-v2.test.js",
+    "test": "node --test cloudflare/worker/worker.test.js && node --test ingest.test.js && node --test country-ingest.test.js && node --test opportunity-routing-v2.test.js"
   },
   "devDependencies": {
     "wrangler": "^4.120.1"
