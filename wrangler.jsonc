@@ -14,7 +14,7 @@
   },
   "keep_vars": true,
   "triggers": {
-    "crons": ["17 5 * * *"]
+    "crons": ["0 * * * *", "20 * * * *", "40 * * * *"]
   },
   "vars": {
     "ENVIRONMENT": "production",
