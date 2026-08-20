@@ -36,6 +36,10 @@ jobs:
           node --check public/global.js
           node --check cloudflare/worker/src/index.js
           node --check cloudflare/worker/src/ingest.js
+          node --check cloudflare/worker/src/runtime.js
+
+      - name: Cloudflare bundle dry run
+        run: npx wrangler deploy --dry-run
 
       - name: Auth UI contract checks
         run: |
@@ -44,6 +48,7 @@ jobs:
           const html = fs.readFileSync('public/index.html', 'utf8');
           const marketplace = fs.readFileSync('public/marketplace.js', 'utf8');
           const global = fs.readFileSync('public/global.js', 'utf8');
+          const wrangler = fs.readFileSync('wrangler.jsonc', 'utf8');
           const required = ['navSignIn','navSignUp','navProfile','logoutBtn','accountCard','loginForm','signupForm','profilePanel'];
           for (const id of required) {
             if (!html.includes(`id="${id}"`)) throw new Error(`Missing UI id: ${id}`);
@@ -58,5 +63,7 @@ jobs:
           for (const field of ['business_name','recruiter_contact_opt_in','account_type','date_of_birth']) {
             if (!marketplace.includes(field)) throw new Error(`Signup metadata missing: ${field}`);
           }
-          console.log('KREVUNO auth UI contract checks passed');
+          if (!wrangler.includes('cloudflare/worker/src/runtime.js')) throw new Error('Safety runtime is not the Cloudflare entrypoint');
+          if (!wrangler.includes('"crons": []')) throw new Error('Legacy Cloudflare public-feed cron is still enabled');
+          console.log('KREVUNO auth/runtime contract checks passed');
           NODE
