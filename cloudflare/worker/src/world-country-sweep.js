@@ -80,15 +80,18 @@ export async function runWorldCountrySweep(env, options = {}) {
       const result = settled[index];
       if (result.status === "fulfilled") {
         const publish = activeCodes.has(country.code);
-        const normalized = result.value.jobs.map((job) => ({
-          ...normalizeHimalayasJob(job, country, nowIso),
-          public_visibility: publish,
-          metadata: {
-            ...normalizeHimalayasJob(job, country, nowIso).metadata,
-            world_scanner: true,
-            rollout_public: publish,
-          },
-        }));
+        const normalized = result.value.jobs.map((job) => {
+          const base = normalizeHimalayasJob(job, country, nowIso);
+          return {
+            ...base,
+            public_visibility: publish,
+            metadata: {
+              ...base.metadata,
+              world_scanner: true,
+              rollout_public: publish,
+            },
+          };
+        });
         rows.push(...normalized);
         results.push({ country: country.code, ok: true, fetched: result.value.jobs.length, public: publish });
       } else {
