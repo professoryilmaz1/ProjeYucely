@@ -1,0 +1,69 @@
+name: KREVUNO CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Worker and ingestion tests
+        run: npm test
+
+      - name: JavaScript syntax checks
+        run: |
+          node --check public/app.js
+          node --check public/marketplace.js
+          node --check public/global.js
+          node --check cloudflare/worker/src/index.js
+          node --check cloudflare/worker/src/ingest.js
+          node --check cloudflare/worker/src/runtime.js
+
+      - name: Cloudflare bundle dry run
+        run: npx wrangler deploy --dry-run
+
+      - name: Auth UI contract checks
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('public/index.html', 'utf8');
+          const marketplace = fs.readFileSync('public/marketplace.js', 'utf8');
+          const global = fs.readFileSync('public/global.js', 'utf8');
+          const wrangler = fs.readFileSync('wrangler.jsonc', 'utf8');
+          const required = ['navSignIn','navSignUp','navProfile','logoutBtn','accountCard','loginForm','signupForm','profilePanel'];
+          for (const id of required) {
+            if (!html.includes(`id="${id}"`)) throw new Error(`Missing UI id: ${id}`);
+          }
+          const forbidden = ['google_translate_element','id="langBtn"','>Language<','EN / TR'];
+          for (const value of forbidden) {
+            if (html.includes(value)) throw new Error(`Legacy language control remains: ${value}`);
+          }
+          if (global.includes('translate.google.com') || global.includes('googleTranslateElementInit')) {
+            throw new Error('Legacy translation runtime remains in global.js');
+          }
+          for (const field of ['business_name','recruiter_contact_opt_in','account_type','date_of_birth']) {
+            if (!marketplace.includes(field)) throw new Error(`Signup metadata missing: ${field}`);
+          }
+          if (!wrangler.includes('cloudflare/worker/src/runtime.js')) throw new Error('Safety runtime is not the Cloudflare entrypoint');
+          if (!wrangler.includes('"crons": []')) throw new Error('Legacy Cloudflare public-feed cron is still enabled');
+          console.log('KREVUNO auth/runtime contract checks passed');
+          NODE

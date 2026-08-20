@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "vovyyvov",
-  "main": "cloudflare/worker/src/index.js",
+  "main": "cloudflare/worker/src/runtime.js",
   "compatibility_date": "2026-08-11",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
@@ -14,7 +14,7 @@
   },
   "keep_vars": true,
   "triggers": {
-    "crons": ["* * * * *"]
+    "crons": []
   },
   "vars": {
     "ENVIRONMENT": "production",
