@@ -37,6 +37,7 @@ jobs:
           node --check cloudflare/worker/src/index.js
           node --check cloudflare/worker/src/ingest.js
           node --check cloudflare/worker/src/country-ingest.js
+          node --check cloudflare/worker/src/world-country-sweep.js
           node --check cloudflare/worker/src/runtime.js
 
       - name: Cloudflare bundle dry run
@@ -51,6 +52,8 @@ jobs:
           const global = fs.readFileSync('public/global.js', 'utf8');
           const wrangler = fs.readFileSync('wrangler.jsonc', 'utf8');
           const countryIngest = fs.readFileSync('cloudflare/worker/src/country-ingest.js', 'utf8');
+          const worldSweep = fs.readFileSync('cloudflare/worker/src/world-country-sweep.js', 'utf8');
+          const runtime = fs.readFileSync('cloudflare/worker/src/runtime.js', 'utf8');
           const required = ['navSignIn','navSignUp','navProfile','logoutBtn','accountCard','loginForm','signupForm','profilePanel'];
           for (const id of required) if (!html.includes(`id="${id}"`)) throw new Error(`Missing UI id: ${id}`);
           const forbidden = ['google_translate_element','id="langBtn"','>Language<','EN / TR'];
@@ -61,11 +64,14 @@ jobs:
           for (const cron of ['0 * * * *','20 * * * *','40 * * * *']) if (!wrangler.includes(`"${cron}"`)) throw new Error(`Global sweep cron missing: ${cron}`);
           if (!countryIngest.includes('ROLLOUT_BATCH_SIZE = 10')) throw new Error('10-country rollout batch missing');
           if (!countryIngest.includes('4 * 60 * 60 * 1000')) throw new Error('4-hour rollout interval missing');
-          if (!countryIngest.includes('SHARD_COUNT = 3')) throw new Error('Three-shard hourly sweep missing');
           if (countryIngest.includes('["CN"')) throw new Error('China must remain excluded');
           const countryPairs = [...countryIngest.matchAll(/\["([A-Z]{2})","[^"]+"\]/g)].map(m => m[1]);
           const unique = new Set(countryPairs);
           if (unique.size !== 150) throw new Error(`Expected 150 unique countries, found ${unique.size}`);
+          if (!worldSweep.includes('GLOBAL_COUNTRIES.filter')) throw new Error('Independent full-world hourly shard scanner missing');
+          if (!worldSweep.includes('public_visibility: publish')) throw new Error('Staged public visibility gate missing');
+          if (!worldSweep.includes('scanned_total_countries: GLOBAL_COUNTRIES.length')) throw new Error('World scanner coverage evidence missing');
+          if (!runtime.includes('runWorldCountrySweep')) throw new Error('Runtime is not wired to independent world scanner');
           for (const country of ['US','DE','GB','IN','NL','FR','BR','CA','PL','CH']) if (!unique.has(country)) throw new Error(`Priority country missing: ${country}`);
-          console.log('KREVUNO 150-country global ingestion contract checks passed');
+          console.log('KREVUNO 150-country independent scan + staged publication contract checks passed');
           NODE
