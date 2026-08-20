@@ -100,7 +100,7 @@
 <script type="module" src="/global.js"></script>
 <script>
 (function(){
-  const jobWords=/\b(job|jobs|work|earn|career|position|engineering|engineer|nurse|driver|software|developer|iş|is ariyorum|mühendis|muhendis|yakınımda|yakinimda|\d{5}|\bNJ\b|\bNY\b|\bPA\b)\b/i;
+  const jobWords=/(job|jobs|work|earn|career|position|engineering|engineer|nurse|driver|software|developer|iş|is ariyorum|iş arıyorum|mühendislik|muhendislik|mühendis|muhendis|yakınımda|yakinimda|\b\d{5}(?:-\d{4})?\b|\bNJ\b|\bNY\b|\bPA\b)/i;
   const openAuth=(target)=>{const d=document.getElementById('authDialog');if(!d)return;if(typeof d.showModal==='function'&&!d.open)d.showModal();else d.setAttribute('open','');setTimeout(()=>document.querySelector(target)?.focus(),80)};
   document.addEventListener('DOMContentLoaded',()=>{
     [['navSignIn','#loginForm input[name=email]'],['navSignUp','#signupForm input[name=display_name]'],['navProfile','#profilePanel']].forEach(([id,target])=>document.getElementById(id)?.addEventListener('click',(e)=>{e.preventDefault();e.stopImmediatePropagation();openAuth(target)},true));
