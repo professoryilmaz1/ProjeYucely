@@ -36,12 +36,13 @@ jobs:
           node --check public/global.js
           node --check cloudflare/worker/src/index.js
           node --check cloudflare/worker/src/ingest.js
+          node --check cloudflare/worker/src/country-ingest.js
           node --check cloudflare/worker/src/runtime.js
 
       - name: Cloudflare bundle dry run
         run: npx wrangler deploy --dry-run
 
-      - name: Auth UI contract checks
+      - name: Auth UI and scheduled-ingestion contract checks
         run: |
           node - <<'NODE'
           const fs = require('fs');
@@ -49,6 +50,7 @@ jobs:
           const marketplace = fs.readFileSync('public/marketplace.js', 'utf8');
           const global = fs.readFileSync('public/global.js', 'utf8');
           const wrangler = fs.readFileSync('wrangler.jsonc', 'utf8');
+          const countryIngest = fs.readFileSync('cloudflare/worker/src/country-ingest.js', 'utf8');
           const required = ['navSignIn','navSignUp','navProfile','logoutBtn','accountCard','loginForm','signupForm','profilePanel'];
           for (const id of required) {
             if (!html.includes(`id="${id}"`)) throw new Error(`Missing UI id: ${id}`);
@@ -64,6 +66,10 @@ jobs:
             if (!marketplace.includes(field)) throw new Error(`Signup metadata missing: ${field}`);
           }
           if (!wrangler.includes('cloudflare/worker/src/runtime.js')) throw new Error('Safety runtime is not the Cloudflare entrypoint');
-          if (!wrangler.includes('"crons": []')) throw new Error('Legacy Cloudflare public-feed cron is still enabled');
-          console.log('KREVUNO auth/runtime contract checks passed');
+          if (!wrangler.includes('"17 5 * * *"')) throw new Error('KREVUNO daily open-job cron is not enabled');
+          for (const country of ['US','DE','GB','IN','NL','FR','BR','CA','PL','CH']) {
+            if (!countryIngest.includes(`code: "${country}"`)) throw new Error(`Priority country missing: ${country}`);
+          }
+          if (countryIngest.includes('code: "CN"')) throw new Error('China must remain excluded from this priority feed');
+          console.log('KREVUNO auth/runtime/daily-ingestion contract checks passed');
           NODE
