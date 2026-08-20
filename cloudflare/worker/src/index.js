@@ -1724,23 +1724,7 @@ export const worker = {
   // -------------------------------------------------------------------------
   // Scheduled handler — Cloudflare Cron Trigger, runs every hour
   // -------------------------------------------------------------------------
-  async scheduled(event, env, ctx) {
-    console.log(
-      `krevuno-ingest scheduled start cron=${event.cron} t=${event.scheduledTime}`
-    );
 
-    ctx.waitUntil(
-      runIngestion(env)
-        .then((result) => {
-          console.log(
-            `krevuno-ingest scheduled done fetched=${result.total_fetched} upserted=${result.total_upserted} errors=${result.total_errors} ms=${result.elapsed_ms}`
-          );
-        })
-        .catch((e) => {
-          console.error("krevuno-ingest scheduled error", e?.message);
-        })
-    );
-  },
 };
 
 export default Sentry.withSentry(
